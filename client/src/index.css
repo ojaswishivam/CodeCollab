@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background-color: #0f0f12;
+}
+
+/* Yjs Monaco Remote Cursor styling */
+.yRemoteSelection {
+  background-color: rgba(250, 204, 21, 0.25);
+  position: absolute;
+}
+
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid #facc15;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.yRemoteSelectionHead::after {
+  position: absolute;
+  content: " ";
+  border: 3px solid #facc15;
+  border-radius: 4px;
+  left: -4px;
+  top: -5px;
+}
