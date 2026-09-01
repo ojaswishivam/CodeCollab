@@ -14,7 +14,11 @@ export interface ExecutionResult {
 
 const TIMEOUT_MS = 5000;
 
-export async function executeCode(language: string, code: string): Promise<ExecutionResult> {
+export async function executeCode(
+  language: string,
+  code: string,
+  stdinInput: string = ""
+): Promise<ExecutionResult> {
   const startTime = Date.now();
   const runId = "run_" + Math.random().toString(36).substring(2, 9);
   const tempDir = path.join(os.tmpdir(), "collab_exec", runId);
@@ -29,12 +33,17 @@ export async function executeCode(language: string, code: string): Promise<Execu
   fs.writeFileSync(filePath, code, "utf8");
 
   try {
-    // Check if Docker is available
+    // Check if Docker is actually running and available
     const hasDocker = await checkDocker();
     if (hasDocker) {
-      return await runInDocker(language, tempDir, fileName, startTime);
+      try {
+        return await runInDocker(language, tempDir, fileName, startTime, stdinInput);
+      } catch (dockerErr) {
+        console.warn("[DOCKER] Docker execution failed, falling back to local isolated:", dockerErr);
+        return await runLocallyIsolated(language, tempDir, filePath, startTime, stdinInput);
+      }
     } else {
-      return await runLocallyIsolated(language, tempDir, filePath, startTime);
+      return await runLocallyIsolated(language, tempDir, filePath, startTime, stdinInput);
     }
   } finally {
     // Clean up temporary files
@@ -46,7 +55,8 @@ export async function executeCode(language: string, code: string): Promise<Execu
 
 function checkDocker(): Promise<boolean> {
   return new Promise((resolve) => {
-    exec("docker -v", (err) => resolve(!err));
+    // Use 'docker info' to verify the daemon is actually responsive, not just the CLI
+    exec("docker info", { timeout: 1500 }, (err) => resolve(!err));
   });
 }
 
@@ -54,7 +64,8 @@ function runInDocker(
   language: string,
   tempDir: string,
   fileName: string,
-  startTime: number
+  startTime: number,
+  stdinInput: string
 ): Promise<ExecutionResult> {
   const imageMap: Record<string, string> = {
     javascript: "sandbox-node",
@@ -65,6 +76,7 @@ function runInDocker(
   const image = imageMap[language] || "sandbox-node";
   const dockerArgs = [
     "run",
+    "-i",
     "--rm",
     "--network", "none",
     "--memory", "128m",
@@ -74,20 +86,21 @@ function runInDocker(
     image,
   ];
 
-  return spawnProcess("docker", dockerArgs, tempDir, startTime, "docker");
+  return spawnProcess("docker", dockerArgs, tempDir, startTime, "docker", stdinInput);
 }
 
 function runLocallyIsolated(
   language: string,
   tempDir: string,
   filePath: string,
-  startTime: number
+  startTime: number,
+  stdinInput: string
 ): Promise<ExecutionResult> {
   if (language === "javascript") {
-    return spawnProcess("node", [filePath], tempDir, startTime, "local_isolated");
+    return spawnProcess("node", [filePath], tempDir, startTime, "local_isolated", stdinInput);
   } else if (language === "python") {
     const pythonCmd = process.platform === "win32" ? "python" : "python3";
-    return spawnProcess(pythonCmd, [filePath], tempDir, startTime, "local_isolated");
+    return spawnProcess(pythonCmd, [filePath], tempDir, startTime, "local_isolated", stdinInput);
   } else if (language === "cpp") {
     // Compile then run
     const exePath = path.join(tempDir, process.platform === "win32" ? "main.exe" : "main");
@@ -103,7 +116,7 @@ function runLocallyIsolated(
             mode: "local_isolated",
           });
         }
-        spawnProcess(exePath, [], tempDir, startTime, "local_isolated").then(resolve);
+        spawnProcess(exePath, [], tempDir, startTime, "local_isolated", stdinInput).then(resolve);
       });
     });
   }
@@ -116,7 +129,8 @@ function spawnProcess(
   args: string[],
   cwd: string,
   startTime: number,
-  mode: "docker" | "local_isolated"
+  mode: "docker" | "local_isolated",
+  stdinInput: string = ""
 ): Promise<ExecutionResult> {
   return new Promise((resolve) => {
     let stdout = "";
@@ -127,6 +141,17 @@ function spawnProcess(
       cwd,
       shell: false,
     });
+
+    if (stdinInput && child.stdin) {
+      try {
+        child.stdin.write(stdinInput);
+        child.stdin.end();
+      } catch (_) {}
+    } else if (child.stdin) {
+      try {
+        child.stdin.end();
+      } catch (_) {}
+    }
 
     const timer = setTimeout(() => {
       isTimedOut = true;

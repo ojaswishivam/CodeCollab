@@ -18,7 +18,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 
-const PORT = 1234;
+const PORT = process.env.PORT || 1234;
 const server = http.createServer(app);
 
 // Yjs WebSocket Server
@@ -29,26 +29,30 @@ wss.on("connection", (conn, req) => {
   const url = req.url || "";
   const docName = url.replace(/^\//, "").split("?")[0] || "major-project-demo";
   activeRooms.add(docName);
-  console.log(`[WS] Peer connected to room: ${docName}`);
+  console.log(`[WS] Peer connected to room: ${docName} (Total Active Rooms: ${activeRooms.size})`);
   
   utils.setupWSConnection(conn, req, { docName });
 
   conn.on("close", () => {
-    if (wss.clients.size === 0) activeRooms.clear();
+    if (wss.clients.size === 0) {
+      activeRooms.clear();
+    }
   });
 });
 
-// Code Execution Endpoint
+// Code Execution Endpoint (with optional stdin support)
 app.post("/api/execute", async (req, res) => {
-  const { language, code } = req.body;
+  const { language, code, stdin } = req.body;
 
   if (!language || typeof code !== "string") {
     return res.status(400).json({ error: "Invalid language or code payload" });
   }
 
-  console.log(`[EXEC] Running ${language} snippet (${code.length} chars)...`);
+  const stdinInput = typeof stdin === "string" ? stdin : "";
+  console.log(`[EXEC] Running ${language} snippet (${code.length} chars, stdin: ${stdinInput.length} chars)...`);
+  
   try {
-    const result = await executeCode(language, code);
+    const result = await executeCode(language, code, stdinInput);
 
     logExecutionMetric({
       language,
@@ -84,14 +88,14 @@ app.get("/api/metrics", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", port: PORT });
+  res.json({ status: "ok", port: PORT, rooms: activeRooms.size });
 });
 
-server.listen(PORT, "0.0.0.0", async () => {
+server.listen(PORT as number, "0.0.0.0", async () => {
   await initDb();
-  console.log(`=========================================`);
-  console.log(`?? Server listening on http://localhost:${PORT}`);
-  console.log(`?? WebSocket ready on ws://localhost:${PORT}`);
-  console.log(`?? Auth & Projects API active`);
-  console.log(`=========================================`);
+  console.log(`=======================================================`);
+  console.log(`[API] CodeCollab Backend API: http://localhost:${PORT}`);
+  console.log(`[WS]  WebSocket CRDT Provider: ws://localhost:${PORT}`);
+  console.log(`[AUTH] Authentication & Persistent Project Store Active`);
+  console.log(`=======================================================`);
 });

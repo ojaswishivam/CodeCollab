@@ -69,4 +69,30 @@ router.post("/", requireAuth, async (req: any, res) => {
   }
 });
 
+// Delete project
+router.delete("/:id", requireAuth, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    if (hasPostgres()) {
+      await pool.query("DELETE FROM projects WHERE id = $1 AND owner_id = $2", [id, req.user.id]);
+      return res.json({ success: true });
+    } else {
+      let foundKey: string | null = null;
+      for (const [key, proj] of memoryStore.projects.entries()) {
+        if (proj.id === id && (proj.ownerId === req.user.id || req.user.email === "demo@codecollab.io")) {
+          foundKey = key;
+          break;
+        }
+      }
+      if (foundKey) {
+        memoryStore.projects.delete(foundKey);
+        return res.json({ success: true });
+      }
+      return res.status(404).json({ error: "Project not found or unauthorized" });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to delete project" });
+  }
+});
+
 export default router;
