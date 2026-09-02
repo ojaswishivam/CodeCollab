@@ -337,10 +337,16 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     }
   };
 
-  const handleRunCode = useCallback(async () => {
-    if (!docRef.current || isRunning || !metaMapRef.current) return;
+  const runCodeRef = useRef<() => void>(() => {});
 
-    const code = docRef.current.getText("monaco").toString();
+  const handleRunCode = useCallback(async () => {
+    if (isRunning || !metaMapRef.current) return;
+
+    // Use editorInstance.getValue() as ground truth for what the user typed in the editor
+    const code = editorInstance
+      ? editorInstance.getValue()
+      : docRef.current?.getText("monaco").toString() || "";
+
     if (!code.trim()) {
       if (onNotify) onNotify("Code editor is empty!", "warning");
       return;
@@ -380,6 +386,10 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
       metaMapRef.current.set("isRunning", false);
     }
   }, [isRunning, language, stdin, onNotify]);
+
+  useEffect(() => {
+    runCodeRef.current = handleRunCode;
+  }, [handleRunCode]);
 
   // Keyboard shortcut listener: Ctrl+Enter (Run) & Ctrl+S (Sync)
   useEffect(() => {
@@ -591,7 +601,12 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
             height="100%"
             theme="vs-dark"
             language={language}
-            onMount={(editor) => setEditorInstance(editor)}
+            onMount={(editor, monaco) => {
+              setEditorInstance(editor);
+              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                runCodeRef.current();
+              });
+            }}
             options={{
               automaticLayout: true,
               fontSize: fontSize,
