@@ -303,9 +303,29 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     if (metaMapRef.current) {
       metaMapRef.current.set("language", newLang);
     }
+
+    const selectedName = LANGUAGES.find((l) => l.id === newLang)?.name || newLang;
+
+    // Check if current editor content is empty or matches any default starter template
+    if (docRef.current) {
+      const ytext = docRef.current.getText("monaco");
+      const currentCode = ytext.toString().trim();
+      const isTemplate = Object.values(CODE_TEMPLATES).some(
+        (tpl) => tpl.trim() === currentCode
+      );
+
+      if (isTemplate || currentCode.length === 0) {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, CODE_TEMPLATES[newLang] || "");
+        if (onNotify) {
+          onNotify(`Switched to ${selectedName} and loaded starter template`, "info");
+        }
+        return;
+      }
+    }
+
     if (onNotify) {
-      const selected = LANGUAGES.find((l) => l.id === newLang)?.name || newLang;
-      onNotify(`Switched language to ${selected}`, "info");
+      onNotify(`Switched language runtime to ${selectedName}`, "info");
     }
   };
 
@@ -324,6 +344,13 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     if (!code.trim()) {
       if (onNotify) onNotify("Code editor is empty!", "warning");
       return;
+    }
+
+    // Client-side quick sanity warning for language mismatch
+    if (language === "python" && (code.includes("console.log") || /^\s*\/\//m.test(code) || code.includes("function "))) {
+      if (onNotify) onNotify("Notice: Running JavaScript code with Python runtime!", "warning");
+    } else if (language === "javascript" && (code.includes("print(") || /^\s*def\s+/m.test(code) || /^\s*import\s+sys/m.test(code))) {
+      if (onNotify) onNotify("Notice: Running Python code with Node.js runtime!", "warning");
     }
 
     metaMapRef.current.set("isRunning", true);

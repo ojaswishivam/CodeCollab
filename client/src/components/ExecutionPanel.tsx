@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Terminal,
   Sliders,
@@ -17,6 +17,7 @@ import {
   ChevronUp,
   ShieldCheck,
   Cpu,
+  Lightbulb,
 } from "lucide-react";
 
 export interface ExecutionResult {
@@ -69,6 +70,26 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Parse stderr and any intelligent hint
+  const { cleanErrorText, hintText } = useMemo(() => {
+    if (!result?.stderr) return { cleanErrorText: "", hintText: null };
+
+    // Strip any raw temporary directory references on the client as a defense-in-depth guarantee
+    let raw = result.stderr
+      .replace(/[a-zA-Z]:\\[^\n\r"]+\\(main\.\w+)/g, "$1")
+      .replace(/\/tmp\/collab_exec\/[^/]+\/(main\.\w+)/g, "$1");
+
+    const hintSplit = raw.split("💡 Hint:");
+    if (hintSplit.length > 1) {
+      return {
+        cleanErrorText: hintSplit[0].trim(),
+        hintText: hintSplit.slice(1).join("💡 Hint:").trim(),
+      };
+    }
+
+    return { cleanErrorText: raw.trim(), hintText: null };
+  }, [result?.stderr]);
 
   const getStatusBadge = () => {
     if (isRunning) {
@@ -151,7 +172,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 setActiveTab("stdin");
                 if (isCollapsed) setIsCollapsed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition relative ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition ${
                 activeTab === "stdin"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-400 hover:text-gray-200"
@@ -159,36 +180,34 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
             >
               <Sliders size={12} />
               <span>Custom Input (stdin)</span>
-              {stdin.trim().length > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              {stdin && (
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
               )}
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 pl-1">
-            {getStatusBadge()}
+          {getStatusBadge()}
 
-            {result && (
-              <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-gray-400 bg-[#1c1c26] border border-gray-700/60 px-2 py-0.5 rounded-md">
-                {result.mode === "docker" ? (
-                  <>
-                    <ShieldCheck size={11} className="text-indigo-400" />
-                    <span>Docker Container</span>
-                  </>
-                ) : (
-                  <>
-                    <Cpu size={11} className="text-amber-400" />
-                    <span>Isolated Process</span>
-                  </>
-                )}
-              </span>
-            )}
-          </div>
+          {result && (
+            <span className="hidden md:flex items-center gap-1 text-[11px] text-gray-500 bg-gray-900/60 px-2 py-0.5 rounded border border-gray-800">
+              {result.mode === "docker" ? (
+                <>
+                  <ShieldCheck size={11} className="text-emerald-400" />
+                  <span>Docker Sandbox</span>
+                </>
+              ) : (
+                <>
+                  <Cpu size={11} className="text-amber-400" />
+                  <span>Isolated Process</span>
+                </>
+              )}
+            </span>
+          )}
         </div>
 
-        {/* Right: Actions & Panel Size Controls */}
+        {/* Right: Actions */}
         <div className="flex items-center gap-1">
-          {activeTab === "output" && result && !isCollapsed && (
+          {activeTab === "output" && result && (
             <>
               <button
                 onClick={handleCopyOutput}
@@ -286,20 +305,34 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-0.5">
                         [STDOUT]
                       </span>
-                      <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed m-0 font-mono text-[12px] bg-[#0f1412] p-2.5 rounded-lg border border-emerald-900/30">
+                      <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed m-0 font-mono text-[12px] bg-[#0f1412] p-2.5 rounded-lg border border-emerald-900/30 shadow-inner">
                         {result.stdout}
                       </pre>
                     </div>
                   )}
 
-                  {result.stderr && (
+                  {cleanErrorText && (
                     <div>
                       <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block mb-0.5">
                         [STDERR]
                       </span>
-                      <pre className="text-rose-400 whitespace-pre-wrap leading-relaxed m-0 font-mono text-[12px] bg-[#1a0f12] p-2.5 rounded-lg border border-rose-900/40">
-                        {result.stderr}
+                      <pre className="text-rose-300 whitespace-pre-wrap leading-relaxed m-0 font-mono text-[12px] bg-[#1a0f12] p-2.5 rounded-lg border border-rose-900/40 shadow-inner">
+                        {cleanErrorText}
                       </pre>
+                    </div>
+                  )}
+
+                  {hintText && (
+                    <div className="flex items-start gap-2.5 bg-indigo-950/40 border border-indigo-500/40 rounded-lg p-3 text-xs text-indigo-200 shadow-lg animate-slide-down">
+                      <Lightbulb size={16} className="text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                      <div className="space-y-1">
+                        <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+                          <span>Runtime Mismatch Detected</span>
+                        </div>
+                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                          {hintText}
+                        </p>
+                      </div>
                     </div>
                   )}
 
