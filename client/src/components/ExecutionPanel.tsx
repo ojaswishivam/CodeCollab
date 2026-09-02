@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Terminal,
   Sliders,
@@ -17,7 +17,6 @@ import {
   ChevronUp,
   ShieldCheck,
   Cpu,
-  Lightbulb,
 } from "lucide-react";
 
 export interface ExecutionResult {
@@ -35,6 +34,7 @@ interface ExecutionPanelProps {
   stdin: string;
   onChangeStdin: (val: string) => void;
   onClear: () => void;
+  onNotify?: (msg: string, type?: "info" | "success" | "warning") => void;
 }
 
 export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
@@ -43,6 +43,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
   stdin,
   onChangeStdin,
   onClear,
+  onNotify,
 }) => {
   const [activeTab, setActiveTab] = useState<"output" | "stdin">("output");
   const [copied, setCopied] = useState(false);
@@ -90,6 +91,16 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
 
     return { cleanErrorText: raw.trim(), hintText: null };
   }, [result?.stderr]);
+
+  // Trigger toast notification when hintText is detected
+  const lastNotifiedHintRef = React.useRef<string | null>(null);
+  
+  useEffect(() => {
+    if (hintText && onNotify && lastNotifiedHintRef.current !== hintText) {
+      lastNotifiedHintRef.current = hintText;
+      onNotify(`Runtime Mismatch Detected\n\n${hintText}`, "warning");
+    }
+  }, [hintText, onNotify]);
 
   const getStatusBadge = () => {
     if (isRunning) {
@@ -319,20 +330,6 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                       <pre className="text-rose-300 whitespace-pre-wrap leading-relaxed m-0 font-mono text-[12px] bg-[#1a0f12] p-2.5 rounded-lg border border-rose-900/40 shadow-inner">
                         {cleanErrorText}
                       </pre>
-                    </div>
-                  )}
-
-                  {hintText && (
-                    <div className="flex items-start gap-2.5 bg-indigo-950/40 border border-indigo-500/40 rounded-lg p-3 text-xs text-indigo-200 shadow-lg animate-slide-down">
-                      <Lightbulb size={16} className="text-amber-400 shrink-0 mt-0.5 animate-pulse" />
-                      <div className="space-y-1">
-                        <div className="font-bold text-indigo-300 flex items-center gap-1.5">
-                          <span>Runtime Mismatch Detected</span>
-                        </div>
-                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                          {hintText}
-                        </p>
-                      </div>
                     </div>
                   )}
 

@@ -672,6 +672,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
           stdin={stdin}
           onChangeStdin={setStdin}
           onClear={handleClearConsole}
+          onNotify={onNotify}
         />
       </div>
     </div>
