@@ -281,7 +281,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
 
       {/* Panel Body */}
       {!isCollapsed && (
-        <div className="flex-1 p-3 overflow-auto space-y-1 select-text bg-[#0a0a0f]">
+        <div className="flex-1 p-3 pb-10 overflow-auto space-y-1 select-text bg-[#0a0a0f]">
           {activeTab === "output" ? (
             <>
               {isRunning && (
