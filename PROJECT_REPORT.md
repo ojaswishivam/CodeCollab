@@ -168,6 +168,13 @@ The development of CodeCollab was executed systematically over five structured e
   - **Searchable & Filterable Live Audit Stream:** Real-time auto-refreshing table displaying Run IDs, language tags, exit statuses, duration benchmarks, and timestamps, filterable by status and keyword.
   - **JSON Telemetry Export:** Single-click export of complete aggregated metrics.
 
+### Phase 6: UI/UX Refinement & Ground Truth Execution Sync
+* **Objective:** Ensure zero-latency UI interactions and perfect synchronization between Monaco's internal CRDT state and the execution engine.
+* **Direct Monaco Command Binding:** Replaced standard DOM keydown listeners with Monaco's native `editor.addCommand()` for `Ctrl+Enter` code execution, preventing Monaco from trapping keyboard events and ensuring immediate, reliable execution triggers.
+* **Ground Truth Evaluation:** Upgraded the execution pipeline to read code directly via `editorInstance.getValue()`, guaranteeing the payload sent to the runner perfectly matches the user's active keystrokes, eliminating desynchronization between the Yjs model and Monaco buffer.
+* **Intelligent Toast Notifications:** Abstracted the "Runtime Mismatch Detection" engine from inline terminal errors into a global, non-intrusive floating toast notification system (`onNotify`) at the top right of the screen, preserving a clean execution output area.
+* **Zero-Lag UI Controls:** Replaced native HTML `<select>` elements with instant-response React DOM popovers and steppers for language and font size selection, eliminating OS-level window painting delays.
+
 ---
 
 ## 4. Security Model & Sandboxing Guarantees

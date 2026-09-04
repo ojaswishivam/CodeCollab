@@ -20,8 +20,9 @@ Powered by **Conflict-Free Replicated Data Types (Yjs CRDT)** and **WebSocket sy
 ## ✨ Key Features
 
 ### 🚀 1. Conflict-Free Real-Time Collaborative Editing (CRDT)
-* **Monaco Editor Integration:** Embedded VS Code core editor with syntax highlighting, line numbers, and multi-cursor support.
+* **Monaco Editor Integration:** Embedded VS Code core editor with syntax highlighting, line numbers, multi-cursor support, and direct `Ctrl+Enter` internal keybindings.
 * **Yjs Mathematical Convergence:** Lamport-timestamped operations guarantee zero-conflict data convergence across concurrent editors typing at the exact same moment.
+* **Ground-Truth Execution:** Code execution payloads are synchronized perfectly by reading directly from `editorInstance.getValue()` rather than standard DOM state.
 * **Presence & Dynamic Cursors:** Real-time visual tracking of collaborator names, custom cursor colors, active selections, and ping latencies.
 * **Zero-Lag UI Controls:** Instant React DOM language selector popover (Node.js, Python 3, C++) and font size stepper (`11px`–`24px`) with 0ms click latency.
 
@@ -39,6 +40,7 @@ Powered by **Conflict-Free Replicated Data Types (Yjs CRDT)** and **WebSocket sy
   * `--pids-limit 64` (Process fork bomb prevention)
   * Non-root unprivileged execution user (`sandboxuser`)
 * **Shared Terminal Console:** Output (`stdout`, `stderr`, runtime duration, exit codes, execution mode) is synchronized across all peers in the room in real time.
+* **Intelligent Toast Notifications:** Smart "Runtime Mismatch" detection surfaces as a non-intrusive global floating toast notification rather than cluttering terminal output.
 * **Terminal Controls:** Collapsible/resizable height presets (`S`, `M`, `L`), fullscreen toggle, copy output with feedback, and log export.
 
 ### 📊 3. Real-Time Telemetry & System Analytics Dashboard
