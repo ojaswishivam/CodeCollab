@@ -13,9 +13,6 @@
 ### Teacher Instructor Command Center (Read-Only Live Inspection)
 ![Teacher Instructor Command Center](docs/screenshots/teacher_dashboard.png)
 
-### Live Browser Build Preview
-![Live CodeClass Preview](docs/screenshots/live_preview.png)
-
 ---
 
 ## Key Architecture: Solving Write-Write Conflicts
