@@ -14,21 +14,31 @@ import {
   Minus,
   Plus,
   ChevronDown,
+  Send,
+  Shield,
+  Users,
+  FileText,
+  Clock,
 } from "lucide-react";
 import { PresenceBar, UserAwareness } from "./PresenceBar";
 import { ExecutionPanel, ExecutionResult } from "./ExecutionPanel";
+import { ProctoringMonitor } from "./ProctoringMonitor";
+import { EvaluationReportModal } from "./EvaluationReportModal";
 import { API_URL, WS_URL } from "../config";
+import { ClassroomSession, SubmissionReport, UserRole } from "../types/codeclass";
 
 interface CollabEditorProps {
-  roomId: string;
+  session: ClassroomSession;
+  userId: string;
   userName: string;
+  userRole: UserRole;
   onUpdateUserName: (name: string) => void;
   onNotify?: (message: string, type?: "info" | "success" | "warning") => void;
 }
 
 const USER_COLORS = [
-  "#f87171", "#fb923c", "#facc15", "#4ade80", 
-  "#38bdf8", "#818cf8", "#c084fc", "#f472b6"
+  "#f87171", "#fb923c", "#facc15", "#4ade80",
+  "#38bdf8", "#818cf8", "#c084fc", "#f472b6",
 ];
 
 const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 22];
@@ -41,102 +51,73 @@ interface LanguageOption {
 }
 
 const LANGUAGES: LanguageOption[] = [
-  { id: "javascript", name: "JavaScript", runtime: "Node.js (v20+)", badgeColor: "bg-amber-400" },
   { id: "python", name: "Python", runtime: "Python 3 (v3.11+)", badgeColor: "bg-sky-400" },
+  { id: "javascript", name: "JavaScript", runtime: "Node.js (v20+)", badgeColor: "bg-amber-400" },
   { id: "cpp", name: "C++", runtime: "GCC (C++17)", badgeColor: "bg-pink-400" },
 ];
 
-const CODE_TEMPLATES: Record<string, string> = {
-  javascript: `// Real-Time Collaborative JavaScript (Node.js)
-console.log("Welcome to CodeCollab Studio!");
-
-function fibonacci(n) {
-  const sequence = [0, 1];
-  for (let i = 2; i < n; i++) {
-    sequence.push(sequence[i - 1] + sequence[i - 2]);
-  }
-  return sequence;
-}
-
-const terms = 10;
-console.log(\`First \${terms} Fibonacci numbers:\`, fibonacci(terms));
-`,
-  python: `# Real-Time Collaborative Python 3
-import sys
-
-def greet(name: str) -> str:
-    return f"Hello, {name}! Ready for collaborative development."
-
-print(greet("Collaborator"))
-
-# Example calculations
-numbers = [12, 45, 78, 23, 56, 89]
-print("Dataset:", numbers)
-print("Sum:", sum(numbers))
-print("Max:", max(numbers))
-print("Average:", round(sum(numbers) / len(numbers), 2))
-`,
-  cpp: `// Real-Time Collaborative C++ (GCC)
-#include <iostream>
-#include <vector>
-#include <numeric>
-
-using namespace std;
-
-int main() {
-    cout << "=== CodeCollab C++ Sandbox ===" << endl;
-    
-    vector<int> data = {10, 20, 30, 40, 50};
-    int total = accumulate(data.begin(), data.end(), 0);
-    
-    cout << "Element count: " << data.size() << endl;
-    cout << "Sum of elements: " << total << endl;
-    
-    return 0;
-}
-`,
-};
-
 export const CollabEditor: React.FC<CollabEditorProps> = ({
-  roomId,
+  session,
+  userId,
   userName,
+  userRole,
   onUpdateUserName,
   onNotify,
 }) => {
+  // Independent student workspace in assessment mode; shared CRDT room in collaborative mode
+  const effectiveRoomId =
+    session.mode === "assessment"
+      ? `${session.code}__student__${userId}`
+      : `${session.code}__shared`;
+
   const [editorInstance, setEditorInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [activeUsers, setActiveUsers] = useState<UserAwareness[]>([]);
   const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
-  const [language, setLanguage] = useState<string>("javascript");
+  const [language, setLanguage] = useState<string>(session.language || "python");
   const [isLangMenuOpen, setIsLangMenuOpen] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(14);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState<boolean>(false);
 
-  // Synchronized Execution & Input State
   const [isRunning, setIsRunning] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
-  const [stdin, setStdin] = useState<string>("");
+  const [evalReport, setEvalReport] = useState<SubmissionReport | null>(null);
+  const [stdin, setStdin] = useState<string>(
+    session.testCases.find((t) => !t.isHidden)?.input || ""
+  );
 
-  // Editor Cursor & Metrics State
   const [cursorPos, setCursorPos] = useState({ lineNumber: 1, column: 1 });
   const [charCount, setCharCount] = useState<number>(0);
   const [lineCount, setLineCount] = useState<number>(1);
   const [latencyMs, setLatencyMs] = useState<number>(18);
+  const [secondsLeft, setSecondsLeft] = useState<number>(
+    (session.durationMinutes || 60) * 60
+  );
+  const autoSubmittedRef = useRef<boolean>(false);
 
   const providerRef = useRef<WebsocketProvider | null>(null);
   const docRef = useRef<Y.Doc | null>(null);
   const metaMapRef = useRef<Y.Map<any> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
   const fontMenuRef = useRef<HTMLDivElement | null>(null);
+  const pasteHandlerRef = useRef<(chars: number) => void>(() => {});
+  const syncHeartbeatTimerRef = useRef<any>(null);
 
-  const [userColor] = useState(() => 
-    USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
+  const [userColor] = useState(
+    () => USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
   );
 
   const currentLangObj = useMemo(() => {
     return LANGUAGES.find((l) => l.id === language) || LANGUAGES[0];
   }, [language]);
 
-  // Close menus on outside click
+  // Sync default language and sample stdin when session changes
+  useEffect(() => {
+    setLanguage(session.language || "python");
+    setStdin(session.testCases.find((t) => !t.isHidden)?.input || "");
+  }, [session.code, session.language]);
+
+  // Close dropdown menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
@@ -152,14 +133,37 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isLangMenuOpen, isFontMenuOpen]);
 
-  // Initialize Yjs and WebSocket synchronization
+  // Send workspace snapshot to central Classroom Session Server
+  const pushWorkspaceSnapshot = useCallback(
+    async (codeSnapshot: string, langSnapshot: string) => {
+      if (userRole === "teacher") return;
+      try {
+        await fetch(`${API_URL}/api/sessions/${session.code}/workspace`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId: userId,
+            studentName: userName,
+            language: langSnapshot,
+            code: codeSnapshot,
+          }),
+        });
+      } catch (_) {}
+    },
+    [session.code, userId, userName, userRole]
+  );
+
+  // Initialize Yjs + WebSocket binding for the effectiveRoomId
   useEffect(() => {
     if (!editorInstance) return;
 
     const ydoc = new Y.Doc();
     docRef.current = ydoc;
 
-    const provider = new WebsocketProvider(WS_URL, roomId, ydoc);
+    const token = sessionStorage.getItem("collab_token");
+    const provider = new WebsocketProvider(WS_URL, effectiveRoomId, ydoc, {
+      params: token ? { token } : {},
+    });
     providerRef.current = provider;
 
     const pingStart = Date.now();
@@ -175,14 +179,15 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
       setLatencyMs(16);
     }
 
-    // Room Metadata Map
     const metaMap = ydoc.getMap("room-meta");
     metaMapRef.current = metaMap;
 
     const updateFromMetaMap = () => {
-      const syncedLang = metaMap.get("language");
-      if (syncedLang && typeof syncedLang === "string") {
-        setLanguage(syncedLang);
+      if (session.mode === "collaborative") {
+        const syncedLang = metaMap.get("language");
+        if (syncedLang && typeof syncedLang === "string") {
+          setLanguage(syncedLang);
+        }
       }
       const syncedRunning = metaMap.get("isRunning");
       setIsRunning(Boolean(syncedRunning));
@@ -197,9 +202,8 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
 
     metaMap.observe(updateFromMetaMap);
 
-    // Awareness Setup
     provider.awareness.setLocalStateField("user", {
-      name: userName,
+      name: `${userName}${userRole === "teacher" ? " (Instructor)" : ""}`,
       color: userColor,
     });
 
@@ -225,7 +229,6 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     provider.awareness.on("change", updateAwareness);
     updateAwareness();
 
-    // Bind Monaco editor Model
     const model = editorInstance.getModel();
     let binding: any = null;
     if (model) {
@@ -234,16 +237,18 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
       provider.on("sync", (isSynced: boolean) => {
         if (isSynced) {
           updateFromMetaMap();
-          // If the room document is totally empty, populate starter template
           if (ytext.toString().length === 0) {
-            const currentLang = (metaMap.get("language") as string) || "javascript";
-            metaMap.set("language", currentLang);
-            if (CODE_TEMPLATES[currentLang]) {
-              ytext.insert(0, CODE_TEMPLATES[currentLang]);
+            const starter =
+              session.starterCode?.[session.language] ||
+              session.starterCode?.python ||
+              "";
+            if (starter) {
+              ytext.insert(0, starter);
             }
           }
           setCharCount(model.getValueLength());
           setLineCount(model.getLineCount());
+          pushWorkspaceSnapshot(ytext.toString(), language);
         }
       });
 
@@ -254,7 +259,6 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
         provider.awareness
       );
 
-      // Track cursor position and metrics
       const cursorDisposable = editorInstance.onDidChangeCursorPosition((e) => {
         setCursorPos({ lineNumber: e.position.lineNumber, column: e.position.column });
       });
@@ -262,16 +266,26 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
       const contentDisposable = model.onDidChangeContent(() => {
         setCharCount(model.getValueLength());
         setLineCount(model.getLineCount());
+        if (syncHeartbeatTimerRef.current) clearTimeout(syncHeartbeatTimerRef.current);
+        syncHeartbeatTimerRef.current = setTimeout(() => {
+          pushWorkspaceSnapshot(model.getValue(), language);
+        }, 1200);
+      });
+
+      const pasteDisposable = editorInstance.onDidPaste((e) => {
+        const pastedChars = model.getValueInRange(e.range).length;
+        pasteHandlerRef.current(pastedChars);
       });
 
       return () => {
         cursorDisposable.dispose();
         contentDisposable.dispose();
-        provider.off("status", handleStatus);
-        provider.awareness.off("change", updateAwareness);
-        if (binding && typeof binding.destroy === "function") {
-          binding.destroy();
-        }
+        pasteDisposable.dispose();
+        if (syncHeartbeatTimerRef.current) clearTimeout(syncHeartbeatTimerRef.current);
+        metaMap.unobserve(updateFromMetaMap);
+        try {
+          if (binding && typeof binding.destroy === "function") binding.destroy();
+        } catch (_) {}
         provider.destroy();
         ydoc.destroy();
       };
@@ -280,52 +294,38 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     return () => {
       provider.off("status", handleStatus);
       provider.awareness.off("change", updateAwareness);
-      if (binding && typeof binding.destroy === "function") {
-        binding.destroy();
-      }
+      if (binding && typeof binding.destroy === "function") binding.destroy();
       provider.destroy();
       ydoc.destroy();
     };
-  }, [editorInstance, roomId]);
+  }, [editorInstance, effectiveRoomId]);
 
   useEffect(() => {
     if (providerRef.current) {
       providerRef.current.awareness.setLocalStateField("user", {
-        name: userName,
+        name: `${userName}${userRole === "teacher" ? " (Instructor)" : ""}`,
         color: userColor,
       });
     }
-  }, [userName, userColor]);
+  }, [userName, userColor, userRole]);
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
     setIsLangMenuOpen(false);
-    if (metaMapRef.current) {
+    if (metaMapRef.current && session.mode === "collaborative") {
       metaMapRef.current.set("language", newLang);
     }
 
-    const selectedName = LANGUAGES.find((l) => l.id === newLang)?.name || newLang;
-
-    // Check if current editor content is empty or matches any default starter template
     if (docRef.current) {
       const ytext = docRef.current.getText("monaco");
       const currentCode = ytext.toString().trim();
-      const isTemplate = Object.values(CODE_TEMPLATES).some(
+      const isStarter = Object.values(session.starterCode || {}).some(
         (tpl) => tpl.trim() === currentCode
       );
-
-      if (isTemplate || currentCode.length === 0) {
+      if ((isStarter || currentCode.length === 0) && session.starterCode?.[newLang]) {
         ytext.delete(0, ytext.length);
-        ytext.insert(0, CODE_TEMPLATES[newLang] || "");
-        if (onNotify) {
-          onNotify(`Switched to ${selectedName} and loaded starter template`, "info");
-        }
-        return;
+        ytext.insert(0, session.starterCode[newLang]);
       }
-    }
-
-    if (onNotify) {
-      onNotify(`Switched language runtime to ${selectedName}`, "info");
     }
   };
 
@@ -342,7 +342,6 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
   const handleRunCode = useCallback(async () => {
     if (isRunning || !metaMapRef.current) return;
 
-    // Use editorInstance.getValue() as ground truth for what the user typed in the editor
     const code = editorInstance
       ? editorInstance.getValue()
       : docRef.current?.getText("monaco").toString() || "";
@@ -350,13 +349,6 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     if (!code.trim()) {
       if (onNotify) onNotify("Code editor is empty!", "warning");
       return;
-    }
-
-    // Client-side quick sanity warning for language mismatch
-    if (language === "python" && (code.includes("console.log") || /^\s*\/\//m.test(code) || code.includes("function "))) {
-      if (onNotify) onNotify("Notice: Running JavaScript code with Python runtime!", "warning");
-    } else if (language === "javascript" && (code.includes("print(") || /^\s*def\s+/m.test(code) || /^\s*import\s+sys/m.test(code))) {
-      if (onNotify) onNotify("Notice: Running Python code with Node.js runtime!", "warning");
     }
 
     metaMapRef.current.set("isRunning", true);
@@ -370,7 +362,12 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
 
       const data: ExecutionResult = await response.json();
       metaMapRef.current.set("executionResult", JSON.stringify(data));
-      if (onNotify) onNotify(`Execution finished (${data.durationMs}ms)`, data.status === "success" ? "success" : "warning");
+      if (onNotify) {
+        onNotify(
+          `Execution finished (${data.durationMs}ms)`,
+          data.status === "success" ? "success" : "warning"
+        );
+      }
     } catch (err: any) {
       const errorResult: ExecutionResult = {
         stdout: "",
@@ -381,42 +378,64 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
         mode: "local_isolated",
       };
       metaMapRef.current.set("executionResult", JSON.stringify(errorResult));
-      if (onNotify) onNotify("Execution server connection error", "warning");
     } finally {
       metaMapRef.current.set("isRunning", false);
     }
-  }, [isRunning, language, stdin, onNotify]);
+  }, [isRunning, language, stdin, editorInstance, onNotify]);
+
+  // Module 5: Automated Code Evaluation Submission
+  const handleEvaluateSubmission = async () => {
+    if (isEvaluating) return;
+    const code = editorInstance
+      ? editorInstance.getValue()
+      : docRef.current?.getText("monaco").toString() || "";
+
+    if (!code.trim()) {
+      if (onNotify) onNotify("Write a solution before submitting!", "warning");
+      return;
+    }
+
+    setIsEvaluating(true);
+    try {
+      const res = await fetch(`${API_URL}/api/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionCode: session.code,
+          studentId: userId,
+          studentName: userName,
+          language,
+          code,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Evaluation failed");
+
+      setEvalReport(data.report);
+      if (onNotify) {
+        onNotify(
+          `Evaluated: ${data.report.passedCount}/${data.report.totalCount} test cases passed (Score: ${data.report.score}/100)`,
+          data.report.score === 100 ? "success" : "info"
+        );
+      }
+    } catch (err: any) {
+      if (onNotify) onNotify(err.message || "Submission failed", "warning");
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
 
   useEffect(() => {
     runCodeRef.current = handleRunCode;
   }, [handleRunCode]);
 
-  // Keyboard shortcut listener: Ctrl+Enter (Run) & Ctrl+S (Sync)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        handleRunCode();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        if (onNotify) onNotify("Code is synchronized in real-time via CRDT!", "info");
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleRunCode, onNotify]);
-
   const handleDownloadCode = () => {
     if (!docRef.current) return;
     const code = docRef.current.getText("monaco").toString();
-    const extMap: Record<string, string> = {
-      javascript: "js",
-      python: "py",
-      cpp: "cpp",
-    };
+    const extMap: Record<string, string> = { javascript: "js", python: "py", cpp: "cpp" };
     const ext = extMap[language] || "txt";
-    const filename = `codecollab_${roomId}_main.${ext}`;
+    const filename = `codeclass_${session.code}_${userName}.${ext}`;
     const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -424,7 +443,6 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    if (onNotify) onNotify(`Downloaded ${filename}`, "success");
   };
 
   const handleClearConsole = () => {
@@ -434,247 +452,340 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
     setExecutionResult(null);
   };
 
+  // Exam countdown timer & auto-submit in assessment mode
+  useEffect(() => {
+    if (session.mode !== "assessment" || userRole !== "student") return;
+
+    const storageKey = `codeclass_exam_end_${session.code}_${userId}`;
+    let endTime = Number(localStorage.getItem(storageKey));
+    if (!endTime || Number.isNaN(endTime)) {
+      endTime = Date.now() + (session.durationMinutes || 60) * 60 * 1000;
+      localStorage.setItem(storageKey, String(endTime));
+    }
+    autoSubmittedRef.current = false;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+
+      if (remaining === 300 && onNotify) {
+        onNotify("5 minutes remaining in assessment!", "warning");
+      }
+      if (remaining === 0 && !autoSubmittedRef.current) {
+        autoSubmittedRef.current = true;
+        if (onNotify) onNotify("Time expired — auto-submitting solution for evaluation...", "warning");
+        handleEvaluateSubmission();
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [session.code, session.mode, session.durationMinutes, userId, userRole]);
+
+  const formatTimer = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    return `${String(mins).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
+  };
+
   return (
-    <div className="flex flex-col h-full gap-2.5 select-none">
-      {/* Collaborator Presence Header (contains the Invite Peers button) */}
-      <PresenceBar
-        users={activeUsers}
-        currentUserName={userName}
-        roomId={roomId}
-        onUpdateName={onUpdateUserName}
-      />
-
-      {/* Main Studio Frame */}
-      <div className="flex-1 flex flex-col bg-[#101017] rounded-2xl overflow-hidden border border-gray-800/90 shadow-2xl">
-        {/* Editor Controls Topbar */}
-        <div className="flex flex-wrap items-center justify-between px-4 py-2 bg-[#15151e] border-b border-gray-800 text-sm gap-2">
-          {/* Left: Instant Zero-Lag Language Dropdown & Execution */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Custom Fast Language Dropdown */}
-            <div ref={langMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setIsLangMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2 bg-[#1e1e28] hover:bg-[#252533] px-3 py-1.5 rounded-lg border border-gray-700/80 text-xs font-semibold text-gray-200 transition active:scale-95 shadow-sm"
-                title="Select language runtime"
+    <div className="flex flex-col lg:flex-row h-full gap-3 overflow-hidden">
+      {/* Left Sidebar: Problem Statement + Consent-Based Proctoring Monitor */}
+      <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-3 overflow-y-auto pr-0.5">
+        {/* Session & Problem Card */}
+        <div className="bg-[#12121a] border border-gray-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
+              {session.code}
+            </span>
+            {session.mode === "assessment" && userRole === "student" && (
+              <span
+                className={`flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  secondsLeft <= 300
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
+                    : "bg-[#1a1a26] text-sky-300 border-gray-700"
+                }`}
               >
-                <Code2 size={13} className="text-indigo-400" />
-                <span>{currentLangObj.name}</span>
-                <span className="text-[10px] text-gray-400 font-mono hidden sm:inline">
-                  ({currentLangObj.runtime.split(" ")[0]})
-                </span>
-                <ChevronDown
-                  size={11}
-                  className={`text-gray-400 transition-transform ${isLangMenuOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {/* Instant Zero-Lag Popover */}
-              {isLangMenuOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-48 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 animate-slide-down flex flex-col">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 py-1 block border-b border-gray-800">
-                    Execution Runtimes
-                  </span>
-                  {LANGUAGES.map((langItem) => (
-                    <button
-                      key={langItem.id}
-                      type="button"
-                      onClick={() => handleLanguageChange(langItem.id)}
-                      className={`flex items-center justify-between px-3 py-2 text-xs text-left transition ${
-                        language === langItem.id
-                          ? "bg-indigo-600/20 text-indigo-300 font-bold"
-                          : "text-gray-200 hover:bg-[#222232] hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${langItem.badgeColor}`} />
-                        <div>
-                          <div className="font-semibold">{langItem.name}</div>
-                          <div className="text-[10px] text-gray-400 font-mono">{langItem.runtime}</div>
-                        </div>
-                      </div>
-                      {language === langItem.id && <Check size={13} className="text-indigo-400" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleRunCode}
-              disabled={isRunning}
-              className={`flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white transition-all shadow-md active:scale-95 ${
-                isRunning
-                  ? "bg-gray-700 cursor-not-allowed opacity-80"
-                  : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40"
-              }`}
-              title="Run Code (Ctrl + Enter)"
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Executing...</span>
-                </>
-              ) : (
-                <>
-                  <Play size={13} className="fill-white" />
-                  <span>Run (Ctrl+Enter)</span>
-                </>
-              )}
-            </button>
+                <Clock size={10} />
+                {formatTimer(secondsLeft)}
+              </span>
+            )}
+            {session.mode === "assessment" ? (
+              <span className="flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                <Shield size={10} />
+                Isolated Workspace
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                <Users size={10} />
+                Shared CRDT Lab
+              </span>
+            )}
           </div>
 
-          {/* Right: Instant Font Size Stepper & Popover, Download */}
-          <div className="flex items-center gap-2">
-            {/* Zero-Lag Fast Font Size Control */}
-            <div ref={fontMenuRef} className="relative flex items-center bg-[#1e1e28] rounded-lg border border-gray-700/80 p-0.5 text-xs text-gray-300">
-              <button
-                type="button"
-                onClick={() => handleFontSizeChange(Math.max(11, fontSize - 1))}
-                disabled={fontSize <= 11}
-                className="p-1 hover:text-white hover:bg-gray-700/60 rounded disabled:opacity-40 disabled:hover:bg-transparent transition"
-                title="Decrease Font Size"
-              >
-                <Minus size={11} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsFontMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1 px-1.5 py-0.5 font-mono text-xs font-bold text-gray-200 hover:text-indigo-300 hover:bg-gray-700/40 rounded transition"
-                title="Choose font size preset"
-              >
-                <Type size={11} className="text-gray-400" />
-                <span>{fontSize}px</span>
-                <ChevronDown size={10} className={`text-gray-400 transition-transform ${isFontMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFontSizeChange(Math.min(24, fontSize + 1))}
-                disabled={fontSize >= 24}
-                className="p-1 hover:text-white hover:bg-gray-700/60 rounded disabled:opacity-40 disabled:hover:bg-transparent transition"
-                title="Increase Font Size"
-              >
-                <Plus size={11} />
-              </button>
-
-              {/* Instant Zero-Lag Dropdown Popover */}
-              {isFontMenuOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 animate-slide-down flex flex-col">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2.5 py-1 block border-b border-gray-800">
-                    Font Size
-                  </span>
-                  {FONT_SIZES.map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => handleFontSizeChange(size)}
-                      className={`flex items-center justify-between px-3 py-1.5 text-xs text-left font-mono transition ${
-                        fontSize === size
-                          ? "bg-indigo-600/20 text-indigo-300 font-bold"
-                          : "text-gray-300 hover:bg-[#222232] hover:text-white"
-                      }`}
-                    >
-                      <span>{size}px</span>
-                      {fontSize === size && <Check size={12} className="text-indigo-400" />}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+              <FileText size={12} className="text-indigo-400" />
+              <span>Assignment Problem</span>
             </div>
+            <h3 className="text-sm font-extrabold text-white">{session.problemTitle}</h3>
+            <p className="text-xs text-gray-300 whitespace-pre-line mt-1.5 leading-relaxed">
+              {session.problemDescription}
+            </p>
+          </div>
 
-            {/* Download Code Button */}
-            <button
-              onClick={handleDownloadCode}
-              className="p-1.5 bg-[#1e1e28] hover:bg-[#282836] text-gray-300 hover:text-white rounded-lg border border-gray-700/80 transition"
-              title="Download source code"
-            >
-              <Download size={13} />
-            </button>
+          {/* Sample Visible Test Cases */}
+          <div className="space-y-1.5 pt-2 border-t border-gray-800">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Sample Test Cases ({session.testCases.length} Total)
+            </div>
+            {session.testCases
+              .filter((tc) => !tc.isHidden)
+              .slice(0, 2)
+              .map((tc, i) => (
+                <div
+                  key={tc.id}
+                  className="bg-[#0c0c12] border border-gray-800 rounded-xl p-2 text-[11px] font-mono space-y-1"
+                >
+                  <div className="text-gray-400">
+                    <span className="text-indigo-400 font-bold">#{i + 1} In:</span>{" "}
+                    {tc.input.replace(/\n/g, " | ").trim() || "(none)"}
+                  </div>
+                  <div className="text-emerald-300">
+                    <span className="text-gray-400 font-bold">Out:</span> {tc.expectedOutput}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
 
-        {/* Monaco Editor Container */}
-        <div className="flex-1 min-h-[280px] relative">
-          <Editor
-            height="100%"
-            theme="vs-dark"
-            language={language}
-            onMount={(editor, monaco) => {
-              setEditorInstance(editor);
-              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                runCodeRef.current();
-              });
-            }}
-            options={{
-              automaticLayout: true,
-              fontSize: fontSize,
-              fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, monospace",
-              minimap: { enabled: true, maxColumn: 80 },
-              wordWrap: "on",
-              padding: { top: 12, bottom: 12 },
-              smoothScrolling: true,
-              cursorBlinking: "smooth",
-              cursorSmoothCaretAnimation: "on",
-              renderLineHighlight: "all",
-              lineNumbersMinChars: 3,
-            }}
+        {/* Proctoring Monitor (for Students in Assessment Mode) */}
+        <ProctoringMonitor
+          sessionCode={session.code}
+          studentId={userId}
+          studentName={userName}
+          enabled={session.proctoringEnabled && userRole === "student"}
+          inactivityThresholdSec={session.inactivityThresholdSec}
+          onAlertToast={onNotify}
+          registerPasteHandler={(fn) => {
+            pasteHandlerRef.current = fn;
+          }}
+        />
+      </aside>
+
+      {/* Right Main Area: Presence Bar + Monaco Editor + Execution Console */}
+      <div className="flex-1 flex flex-col h-full gap-2.5 overflow-hidden select-none">
+        <PresenceBar
+          users={activeUsers}
+          currentUserName={userName}
+          roomId={effectiveRoomId}
+          onUpdateName={onUpdateUserName}
+        />
+
+        <div className="flex-1 flex flex-col bg-[#101017] rounded-2xl overflow-hidden border border-gray-800/90 shadow-2xl">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center justify-between px-4 py-2 bg-[#15151e] border-b border-gray-800 text-sm gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Language Dropdown */}
+              <div ref={langMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsLangMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 bg-[#1e1e28] hover:bg-[#252533] px-3 py-1.5 rounded-lg border border-gray-700/80 text-xs font-semibold text-gray-200 transition shadow-sm"
+                >
+                  <Code2 size={13} className="text-indigo-400" />
+                  <span>{currentLangObj.name}</span>
+                  <ChevronDown
+                    size={11}
+                    className={`text-gray-400 transition-transform ${isLangMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isLangMenuOpen && (
+                  <div className="absolute top-full left-0 mt-1.5 w-48 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 flex flex-col">
+                    {LANGUAGES.map((langItem) => (
+                      <button
+                        key={langItem.id}
+                        type="button"
+                        onClick={() => handleLanguageChange(langItem.id)}
+                        className={`flex items-center justify-between px-3 py-2 text-xs text-left transition ${
+                          language === langItem.id
+                            ? "bg-indigo-600/20 text-indigo-300 font-bold"
+                            : "text-gray-200 hover:bg-[#222232]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${langItem.badgeColor}`} />
+                          <span>{langItem.name}</span>
+                        </div>
+                        {language === langItem.id && <Check size={13} className="text-indigo-400" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Run Code */}
+              <button
+                onClick={handleRunCode}
+                disabled={isRunning}
+                className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-lg text-white transition shadow-md ${
+                  isRunning
+                    ? "bg-gray-700 cursor-not-allowed opacity-80"
+                    : "bg-[#222230] hover:bg-[#2c2c3d] border border-gray-700"
+                }`}
+              >
+                {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                <span>{isRunning ? "Running..." : "Run Sample"}</span>
+              </button>
+
+              {/* Module 5: Submit & Evaluate */}
+              <button
+                onClick={handleEvaluateSubmission}
+                disabled={isEvaluating}
+                className={`flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white transition shadow-md ${
+                  isEvaluating
+                    ? "bg-gray-700 cursor-not-allowed opacity-80"
+                    : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40"
+                }`}
+              >
+                {isEvaluating ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Send size={13} />
+                )}
+                <span>{isEvaluating ? "Evaluating..." : "Submit & Evaluate"}</span>
+              </button>
+            </div>
+
+            {/* Right Controls: Font Size + Download */}
+            <div className="flex items-center gap-2">
+              <div
+                ref={fontMenuRef}
+                className="relative flex items-center bg-[#1e1e28] rounded-lg border border-gray-700/80 p-0.5 text-xs text-gray-300"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleFontSizeChange(Math.max(11, fontSize - 1))}
+                  className="p-1 hover:text-white rounded"
+                >
+                  <Minus size={11} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFontMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 font-mono text-xs font-bold text-gray-200"
+                >
+                  <Type size={11} className="text-gray-400" />
+                  <span>{fontSize}px</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFontSizeChange(Math.min(24, fontSize + 1))}
+                  className="p-1 hover:text-white rounded"
+                >
+                  <Plus size={11} />
+                </button>
+                {isFontMenuOpen && (
+                  <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 flex flex-col">
+                    {FONT_SIZES.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => handleFontSizeChange(size)}
+                        className="px-3 py-1.5 text-xs text-left font-mono text-gray-300 hover:bg-[#222232]"
+                      >
+                        {size}px
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleDownloadCode}
+                className="p-1.5 bg-[#1e1e28] hover:bg-[#282836] text-gray-300 hover:text-white rounded-lg border border-gray-700/80 transition"
+                title="Download source code"
+              >
+                <Download size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Monaco Editor */}
+          <div className="flex-1 min-h-[240px] relative">
+            <Editor
+              height="100%"
+              theme="vs-dark"
+              language={language}
+              onMount={(editor, monaco) => {
+                setEditorInstance(editor);
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                  runCodeRef.current();
+                });
+              }}
+              options={{
+                readOnly: userRole === "teacher" && session.mode === "assessment",
+                automaticLayout: true,
+                fontSize: fontSize,
+                fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, monospace",
+                minimap: { enabled: false },
+                wordWrap: "on",
+                padding: { top: 12, bottom: 12 },
+                smoothScrolling: true,
+                cursorBlinking: "smooth",
+              }}
+            />
+          </div>
+
+          {/* Status Bar */}
+          <div className="flex items-center justify-between px-3.5 py-1 bg-[#121218] border-t border-gray-800 text-[11px] text-gray-400 font-mono">
+            <div className="flex items-center gap-3">
+              <span>
+                Ln {cursorPos.lineNumber}, Col {cursorPos.column}
+              </span>
+              <span className="hidden sm:inline text-gray-600">|</span>
+              <span className="hidden sm:inline">
+                {lineCount} lines, {charCount} chars
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="hidden md:inline text-gray-400">
+                {session.mode === "assessment" ? "Isolated Workspace" : "Shared CRDT"}
+              </span>
+              <span className="hidden md:inline text-gray-600">|</span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    status === "connected" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+                  }`}
+                />
+                <span className={status === "connected" ? "text-emerald-300" : "text-amber-300"}>
+                  {status === "connected" ? `Synced (${latencyMs}ms)` : status}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Execution Console */}
+          <ExecutionPanel
+            result={executionResult}
+            isRunning={isRunning}
+            stdin={stdin}
+            onChangeStdin={setStdin}
+            onClear={handleClearConsole}
+            onNotify={onNotify}
           />
         </div>
-
-        {/* Editor Status Bar */}
-        <div className="flex items-center justify-between px-3.5 py-1 bg-[#121218] border-t border-gray-800 text-[11px] text-gray-400 font-mono select-none">
-          <div className="flex items-center gap-3">
-            <span>
-              Ln {cursorPos.lineNumber}, Col {cursorPos.column}
-            </span>
-            <span className="hidden sm:inline text-gray-600">|</span>
-            <span className="hidden sm:inline">
-              {lineCount} lines, {charCount} chars
-            </span>
-            <span className="hidden sm:inline text-gray-600">|</span>
-            <span className="hidden sm:inline uppercase text-gray-300 font-semibold">
-              {language}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden md:inline">UTF-8</span>
-            <span className="hidden md:inline text-gray-600">|</span>
-            <div className="flex items-center gap-1.5">
-              {status === "connected" ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"></span>
-                  <span className="text-emerald-300 font-medium capitalize">
-                    Synced ({latencyMs}ms)
-                  </span>
-                </>
-              ) : status === "connecting" ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                  <span className="text-amber-300 capitalize">Connecting...</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                  <span className="text-rose-400 capitalize">Disconnected</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Terminal Execution Panel */}
-        <ExecutionPanel
-          result={executionResult}
-          isRunning={isRunning}
-          stdin={stdin}
-          onChangeStdin={setStdin}
-          onClear={handleClearConsole}
-          onNotify={onNotify}
-        />
       </div>
+
+      {/* Module 5 Automated Evaluation Report Modal */}
+      <EvaluationReportModal
+        report={evalReport}
+        onClose={() => setEvalReport(null)}
+      />
     </div>
   );
 };

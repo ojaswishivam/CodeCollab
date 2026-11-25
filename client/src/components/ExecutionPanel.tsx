@@ -161,14 +161,14 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
       {/* Panel Top Bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#14141c] border-b border-gray-800 select-none">
         {/* Left: Tab Selectors & Status */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[#1e1e28] p-0.5 rounded-lg border border-gray-700/80">
+        <div className="flex items-center gap-2 whitespace-nowrap min-w-0">
+          <div className="flex items-center bg-[#1e1e28] p-0.5 rounded-lg border border-gray-700/80 shrink-0">
             <button
               onClick={() => {
                 setActiveTab("output");
                 if (isCollapsed) setIsCollapsed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 activeTab === "output"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-400 hover:text-gray-200"
@@ -183,24 +183,24 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 setActiveTab("stdin");
                 if (isCollapsed) setIsCollapsed(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                 activeTab === "stdin"
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-400 hover:text-gray-200"
               }`}
             >
               <Sliders size={12} />
-              <span>Custom Input (stdin)</span>
+              <span>Input (stdin)</span>
               {stdin && (
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
               )}
             </button>
           </div>
 
-          {getStatusBadge()}
+          <div className="shrink-0">{getStatusBadge()}</div>
 
           {result && (
-            <span className="hidden md:flex items-center gap-1 text-[11px] text-gray-500 bg-gray-900/60 px-2 py-0.5 rounded border border-gray-800">
+            <span className="hidden xl:flex items-center gap-1 text-[11px] text-gray-500 bg-gray-900/60 px-2 py-0.5 rounded border border-gray-800 shrink-0">
               {result.mode === "docker" ? (
                 <>
                   <ShieldCheck size={11} className="text-emerald-400" />
@@ -226,7 +226,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 title="Copy Terminal Output"
               >
                 {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
+                <span className="hidden xl:inline">{copied ? "Copied" : "Copy"}</span>
               </button>
 
               <button
@@ -235,7 +235,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 title="Download Execution Log"
               >
                 <Download size={12} />
-                <span className="hidden sm:inline">Export</span>
+                <span className="hidden xl:inline">Export</span>
               </button>
 
               <button
@@ -244,7 +244,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 title="Clear Output"
               >
                 <Trash2 size={12} />
-                <span className="hidden sm:inline">Clear</span>
+                <span className="hidden xl:inline">Clear</span>
               </button>
             </>
           )}
@@ -304,7 +304,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
 
               {!isRunning && !result && (
                 <div className="text-gray-500 py-3 flex flex-col gap-1">
-                  <p>Ready. Press <kbd className="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-gray-700">Ctrl + Enter</kbd> or click <strong className="text-emerald-400">&quot;Run Code&quot;</strong> to execute in the cloud sandbox.</p>
+                  <p>Ready. Press <kbd className="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-gray-700">Ctrl + Enter</kbd> or click <strong className="text-emerald-400">&quot;Run Sample&quot;</strong> to execute in the sandbox.</p>
                   <p className="text-[11px] text-gray-600">Standard output and error streams will stream below in real time.</p>
                 </div>
               )}

@@ -294,3 +294,190 @@ function sanitizeErrorOutput(
 
   return cleaned;
 }
+
+export interface EvalTestCaseInput {
+  id: string;
+  input: string;
+  expectedOutput: string;
+  isHidden?: boolean;
+  points?: number;
+}
+
+export interface EvalTestCaseResult {
+  testCaseId: string;
+  index: number;
+  passed: boolean;
+  isHidden: boolean;
+  input?: string;
+  expectedOutput?: string;
+  actualOutput?: string;
+  error?: string;
+  durationMs: number;
+}
+
+export interface AutomatedEvaluationResult {
+  compilationStatus: "Successful" | "Compilation Error";
+  compileError?: string;
+  passedCount: number;
+  totalCount: number;
+  score: number;
+  executionTimeSec: number;
+  testResults: EvalTestCaseResult[];
+}
+
+/**
+ * Module 5: Automated Code Evaluation against predefined test cases.
+ * Compiles once for compiled languages (C++), then runs each test case in isolation.
+ */
+export async function evaluateTestCases(
+  language: string,
+  code: string,
+  testCases: EvalTestCaseInput[]
+): Promise<AutomatedEvaluationResult> {
+  const runId = "eval_" + Math.random().toString(36).substring(2, 9);
+  const tempDir = path.join(os.tmpdir(), "collab_exec", runId);
+  fs.mkdirSync(tempDir, { recursive: true });
+
+  let fileName = "main.js";
+  if (language === "python") fileName = "main.py";
+  if (language === "cpp") fileName = "main.cpp";
+
+  const filePath = path.join(tempDir, fileName);
+  fs.writeFileSync(filePath, code, "utf8");
+
+  const normalizeOut = (s: string) => s.replace(/\r\n/g, "\n").trim();
+
+  try {
+    const useDocker = await checkDocker();
+    let exeName = "";
+    if (language === "cpp" && !useDocker) {
+      exeName = process.platform === "win32" ? "main.exe" : "./main";
+      const exePath = path.join(tempDir, process.platform === "win32" ? "main.exe" : "main");
+
+      const compileRes = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        exec(`g++ -O2 -o "${exePath}" "${fileName}"`, { cwd: tempDir, timeout: TIMEOUT_MS }, (err, _, stderr) => {
+          if (err) {
+            resolve({
+              ok: false,
+              error: sanitizeErrorOutput(stderr || err.message, tempDir, fileName, language, code),
+            });
+          } else {
+            resolve({ ok: true });
+          }
+        });
+      });
+
+      if (!compileRes.ok) {
+        return {
+          compilationStatus: "Compilation Error",
+          compileError: compileRes.error,
+          passedCount: 0,
+          totalCount: testCases.length,
+          score: 0,
+          executionTimeSec: 0,
+          testResults: testCases.map((tc, idx) => ({
+            testCaseId: tc.id,
+            index: idx + 1,
+            passed: false,
+            isHidden: Boolean(tc.isHidden),
+            input: tc.isHidden ? undefined : tc.input,
+            expectedOutput: tc.isHidden ? undefined : tc.expectedOutput,
+            error: "Compilation Error",
+            durationMs: 0,
+          })),
+        };
+      }
+    }
+
+    const results: EvalTestCaseResult[] = [];
+    let totalDurationMs = 0;
+    let passedCount = 0;
+    let earnedPoints = 0;
+    let totalPoints = 0;
+
+    for (let i = 0; i < testCases.length; i++) {
+      const tc = testCases[i];
+      const pts = tc.points || 10;
+      totalPoints += pts;
+
+      const tcStart = Date.now();
+      let execRes: ExecutionResult;
+
+      if (useDocker) {
+        execRes = await runInDocker(language, tempDir, fileName, tcStart, tc.input, code);
+      } else if (language === "javascript") {
+        execRes = await spawnProcess("node", [fileName], tempDir, tcStart, "local_isolated", tc.input, tempDir, fileName, language, code);
+      } else if (language === "python") {
+        const pythonCmd = process.platform === "win32" ? "python" : "python3";
+        execRes = await spawnProcess(pythonCmd, [fileName], tempDir, tcStart, "local_isolated", tc.input, tempDir, fileName, language, code);
+      } else if (language === "cpp") {
+        execRes = await spawnProcess(exeName, [], tempDir, tcStart, "local_isolated", tc.input, tempDir, fileName, language, code);
+      } else {
+        throw new Error(`Unsupported language: ${language}`);
+      }
+
+      totalDurationMs += execRes.durationMs;
+
+      // Check syntax/compile error in interpreted languages on first failure
+      if (
+        i === 0 &&
+        execRes.status === "runtime_error" &&
+        execRes.stderr.includes("SyntaxError")
+      ) {
+        return {
+          compilationStatus: "Compilation Error",
+          compileError: execRes.stderr,
+          passedCount: 0,
+          totalCount: testCases.length,
+          score: 0,
+          executionTimeSec: Number((totalDurationMs / 1000).toFixed(2)),
+          testResults: testCases.map((t, idx) => ({
+            testCaseId: t.id,
+            index: idx + 1,
+            passed: false,
+            isHidden: Boolean(t.isHidden),
+            error: idx === 0 ? execRes.stderr : "Compilation/Syntax Error",
+            durationMs: idx === 0 ? execRes.durationMs : 0,
+          })),
+        };
+      }
+
+      const actual = normalizeOut(execRes.stdout);
+      const expected = normalizeOut(tc.expectedOutput);
+      const passed = execRes.status === "success" && actual === expected;
+
+      if (passed) {
+        passedCount++;
+        earnedPoints += pts;
+      }
+
+      results.push({
+        testCaseId: tc.id,
+        index: i + 1,
+        passed,
+        isHidden: Boolean(tc.isHidden),
+        input: tc.isHidden ? undefined : tc.input,
+        expectedOutput: tc.isHidden ? undefined : expected,
+        actualOutput: tc.isHidden ? undefined : actual,
+        error: execRes.status !== "success" ? execRes.stderr || execRes.status : undefined,
+        durationMs: execRes.durationMs,
+      });
+    }
+
+    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+    const executionTimeSec = Number((totalDurationMs / 1000).toFixed(2));
+
+    return {
+      compilationStatus: "Successful",
+      passedCount,
+      totalCount: testCases.length,
+      score,
+      executionTimeSec,
+      testResults: results,
+    };
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (_) {}
+  }
+}

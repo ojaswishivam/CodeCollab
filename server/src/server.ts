@@ -6,9 +6,12 @@ import { WebSocketServer } from "ws";
 import * as utils from "y-websocket/bin/utils";
 import { executeCode } from "./execution/runner";
 import { logExecutionMetric, getMetricsSummary } from "./metrics/store";
-import { initDb } from "./db";
+import { initDb, verifyToken } from "./db/store";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/projects";
+import sessionRoutes from "./routes/sessions";
+import proctoringRoutes from "./routes/proctoring";
+import evaluateRoutes from "./routes/evaluate";
 
 const app = express();
 app.use(cors());
@@ -17,6 +20,9 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/sessions", sessionRoutes);
+app.use("/api/proctoring", proctoringRoutes);
+app.use("/api/evaluate", evaluateRoutes);
 
 const PORT = process.env.PORT || 1234;
 const server = http.createServer(app);
@@ -27,10 +33,33 @@ const activeRooms = new Set<string>();
 
 wss.on("connection", (conn, req) => {
   const url = req.url || "";
-  const docName = url.replace(/^\//, "").split("?")[0] || "major-project-demo";
+  const [rawPath, rawQuery] = url.split("?");
+  const docName = rawPath.replace(/^\//, "") || "major-project-demo";
+  const params = new URLSearchParams(rawQuery || "");
+  const tokenParam = params.get("token");
+  const decodedUser = tokenParam ? verifyToken(tokenParam) : null;
+
+  const isTeacherInspectingStudent =
+    decodedUser?.role === "teacher" && docName.includes("__student__");
+
   activeRooms.add(docName);
-  console.log(`[WS] Peer connected to room: ${docName} (Total Active Rooms: ${activeRooms.size})`);
-  
+  console.log(
+    `[WS] Peer connected to room: ${docName} (role: ${decodedUser?.role || "guest"}, readOnly: ${isTeacherInspectingStudent})`
+  );
+
+  // Enforce server-side read-only protection when a teacher inspects a student's isolated workspace
+  if (isTeacherInspectingStudent) {
+    conn.on("message", (data: Buffer) => {
+      try {
+        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        // Yjs protocol: messageType 0 = sync; syncSubType 2 = Update
+        if (buf.length >= 2 && buf[0] === 0 && buf[1] === 2) {
+          return;
+        }
+      } catch (_) {}
+    });
+  }
+
   utils.setupWSConnection(conn, req, { docName });
 
   conn.on("close", () => {

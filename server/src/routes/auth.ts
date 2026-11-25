@@ -1,27 +1,34 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { pool, memoryStore, generateToken, verifyToken, hasPostgres } from "../db";
+import { pool, memoryStore, generateToken, verifyToken, hasPostgres, UserRole } from "../db/store";
 
 const router = Router();
 
 // Sign Up
 router.post("/signup", async (req, res) => {
-  const { email, password, displayName } = req.body;
+  const { email, password, displayName, role } = req.body;
   if (!email || !password || !displayName) {
     return res.status(400).json({ error: "All fields are required" });
   }
 
+  const normalizedRole: UserRole = role === "teacher" ? "teacher" : "student";
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
   try {
     if (hasPostgres()) {
       const result = await pool.query(
-        "INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name",
-        [email.toLowerCase(), passwordHash, displayName]
+        "INSERT INTO users (email, password_hash, display_name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name, role",
+        [email.toLowerCase(), passwordHash, displayName, normalizedRole]
       );
-      const user = result.rows[0];
-      const token = generateToken({ id: user.id, email: user.email, displayName: user.display_name });
+      const row = result.rows[0];
+      const user = {
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        role: row.role as UserRole,
+      };
+      const token = generateToken(user);
       return res.json({ token, user });
     } else {
       if (memoryStore.users.has(email.toLowerCase())) {
@@ -32,10 +39,17 @@ router.post("/signup", async (req, res) => {
         email: email.toLowerCase(),
         passwordHash,
         displayName,
+        role: normalizedRole,
       };
       memoryStore.users.set(email.toLowerCase(), newUser);
-      const token = generateToken({ id: newUser.id, email: newUser.email, displayName: newUser.displayName });
-      return res.json({ token, user: { id: newUser.id, email: newUser.email, displayName: newUser.displayName } });
+      const userPayload = {
+        id: newUser.id,
+        email: newUser.email,
+        displayName: newUser.displayName,
+        role: newUser.role,
+      };
+      const token = generateToken(userPayload);
+      return res.json({ token, user: userPayload });
     }
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to sign up" });
@@ -55,12 +69,18 @@ router.post("/login", async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(400).json({ error: "Invalid credentials" });
       }
-      const user = result.rows[0];
-      const isMatch = await bcrypt.compare(password, user.password_hash);
+      const row = result.rows[0];
+      const isMatch = await bcrypt.compare(password, row.password_hash);
       if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-      const token = generateToken({ id: user.id, email: user.email, displayName: user.display_name });
-      return res.json({ token, user: { id: user.id, email: user.email, displayName: user.display_name } });
+      const userPayload = {
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        role: (row.role || "student") as UserRole,
+      };
+      const token = generateToken(userPayload);
+      return res.json({ token, user: userPayload });
     } else {
       const user = memoryStore.users.get(email.toLowerCase());
       if (!user) return res.status(400).json({ error: "Invalid credentials" });
@@ -68,8 +88,14 @@ router.post("/login", async (req, res) => {
       const isMatch = await bcrypt.compare(password, user.passwordHash);
       if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-      const token = generateToken({ id: user.id, email: user.email, displayName: user.displayName });
-      return res.json({ token, user: { id: user.id, email: user.email, displayName: user.displayName } });
+      const userPayload = {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+      };
+      const token = generateToken(userPayload);
+      return res.json({ token, user: userPayload });
     }
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to log in" });

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool, memoryStore, verifyToken, hasPostgres } from "../db";
+import { pool, memoryStore, verifyToken, hasPostgres } from "../db/store";
 
 const router = Router();
 
