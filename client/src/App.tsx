@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Code2,
-  Activity,
   LogIn,
   LogOut,
   Info,
@@ -11,7 +10,6 @@ import {
   BookOpen,
 } from "lucide-react";
 import { CollabEditor } from "./components/CollabEditor";
-import { MetricsDashboard } from "./components/MetricsDashboard";
 import { TeacherDashboard } from "./components/TeacherDashboard";
 import { AuthModal } from "./components/AuthModal";
 import { API_URL } from "./config";
@@ -66,7 +64,7 @@ export default function App() {
     return saved || `Student-${Math.floor(100 + Math.random() * 900)}`;
   });
 
-  const [currentView, setCurrentView] = useState<"workspace" | "teacher" | "analytics">(() =>
+  const [currentView, setCurrentView] = useState<"workspace" | "teacher">(() =>
     currentUser?.role === "teacher" ? "teacher" : "workspace"
   );
 
@@ -136,38 +134,38 @@ export default function App() {
   const effectiveRole = currentUser?.role || "student";
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#07070a] text-white overflow-hidden font-sans">
-      {/* Top Navigation Header */}
-      <header className="px-5 py-2.5 bg-[#0f0f16] border-b border-gray-800 flex items-center justify-between shadow-lg z-10 shrink-0 gap-3 flex-wrap">
-        <div className="flex items-center gap-5">
+    <div className="h-screen w-screen flex flex-col bg-[#090D16] text-[#dfe2eb] overflow-hidden font-sans">
+      {/* Persistent Top Header Chrome (Precision Proctor IDE) */}
+      <header className="px-4 py-2 bg-[#161B22] border-b border-[#30363D] flex items-center justify-between z-10 shrink-0 gap-3 flex-wrap">
+        <div className="flex items-center gap-4">
           {/* CodeClass Brand Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
-              <GraduationCap size={18} />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#10B981]/15 border border-[#10B981]/40 flex items-center justify-center text-[#10B981] shadow-sm">
+              <GraduationCap size={17} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-extrabold tracking-tight text-white">
+                <h1 className="text-sm font-bold tracking-tight text-white">
                   CodeClass
                 </h1>
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.2 rounded border border-indigo-500/30">
-                  Proctored IDE
+                <span className="text-[10px] bg-[#10B981]/15 text-[#34D399] font-mono px-1.5 py-0.5 rounded border border-[#10B981]/30 font-semibold">
+                  IDE v2.0
                 </span>
               </div>
-              <p className="text-[10px] text-gray-400">
-                Collaborative Coding, Automated Evaluation & Online Proctoring
+              <p className="text-[10px] text-gray-400 hidden sm:block">
+                Precision Proctor &amp; Collaborative Coding Studio
               </p>
             </div>
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center bg-[#171722] p-1 rounded-xl border border-gray-700/80">
+          <div className="flex items-center bg-[#0D1117] p-0.5 rounded-lg border border-[#30363D]">
             <button
               onClick={() => setCurrentView("workspace")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                 currentView === "workspace"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-gray-400 hover:text-gray-200"
+                  ? "bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40"
+                  : "text-gray-400 hover:text-gray-200 border border-transparent"
               }`}
             >
               <Code2 size={13} />
@@ -177,39 +175,27 @@ export default function App() {
             {effectiveRole === "teacher" && (
               <button
                 onClick={() => setCurrentView("teacher")}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                   currentView === "teacher"
-                    ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
-                    : "text-gray-400 hover:text-gray-200"
+                    ? "bg-[#10B981]/20 text-[#34D399] border border-[#10B981]/40"
+                    : "text-gray-400 hover:text-gray-200 border border-transparent"
                 }`}
               >
                 <BookOpen size={13} />
                 <span>Teacher Dashboard</span>
               </button>
             )}
-
-            <button
-              onClick={() => setCurrentView("analytics")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                currentView === "analytics"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              <Activity size={13} />
-              <span>Telemetry</span>
-            </button>
           </div>
         </div>
 
         {/* Right Controls: Session Joiner & Auth */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {currentView === "workspace" && (
             <div className="flex items-center gap-1.5">
               <select
                 value={activeSessionCode}
                 onChange={(e) => switchSession(e.target.value)}
-                className="bg-[#171722] text-xs text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl border border-gray-700 focus:outline-none focus:border-indigo-500"
+                className="bg-[#0D1117] text-xs text-[#60A5FA] font-mono font-semibold px-2.5 py-1.5 rounded-md border border-[#30363D] focus:outline-none focus:border-[#3B82F6]"
               >
                 {sessions.map((s) => (
                   <option key={s.id} value={s.code}>
@@ -222,12 +208,12 @@ export default function App() {
                 value={joinInput}
                 onChange={(e) => setJoinInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && switchSession(joinInput)}
-                className="bg-[#171722] text-xs text-white px-2.5 py-1.5 rounded-xl border border-gray-700 focus:outline-none focus:border-indigo-500 font-mono w-28 placeholder-gray-500"
-                placeholder="Code"
+                className="bg-[#0D1117] text-xs text-white px-2.5 py-1.5 rounded-md border border-[#30363D] focus:outline-none focus:border-[#3B82F6] font-mono w-28 placeholder-gray-500"
+                placeholder="Session Code"
               />
               <button
                 onClick={() => switchSession(joinInput)}
-                className="bg-indigo-600 hover:bg-indigo-500 text-xs font-bold px-3 py-1.5 rounded-xl text-white transition shadow"
+                className="bg-[#3B82F6] hover:bg-[#2563EB] text-xs font-semibold px-3 py-1.5 rounded-md text-white transition"
               >
                 Join
               </button>
@@ -235,13 +221,13 @@ export default function App() {
           )}
 
           {/* User Profile */}
-          <div className="flex items-center gap-2 pl-3 border-l border-gray-800">
+          <div className="flex items-center gap-2 pl-2.5 border-l border-[#30363D]">
             {currentUser ? (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-[#14141c] px-3 py-1 rounded-xl border border-gray-700/80 text-xs">
+                <div className="flex items-center gap-1.5 bg-[#0D1117] px-2.5 py-1 rounded-md border border-[#30363D] text-xs">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      currentUser.role === "teacher" ? "bg-purple-400" : "bg-emerald-400"
+                      currentUser.role === "teacher" ? "bg-[#3B82F6]" : "bg-[#10B981]"
                     }`}
                   />
                   <span className="font-semibold text-gray-200">{currentUser.displayName}</span>
@@ -251,7 +237,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                  className="p-1.5 text-gray-400 hover:text-[#F43F5E] hover:bg-[#F43F5E]/10 rounded-md border border-transparent hover:border-[#F43F5E]/30 transition"
                   title="Sign Out"
                 >
                   <LogOut size={14} />
@@ -260,7 +246,7 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setIsAuthOpen(true)}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold px-3.5 py-1.5 rounded-xl text-white transition shadow-md shadow-indigo-600/30"
+                className="flex items-center gap-1.5 bg-[#10B981] hover:bg-[#059669] text-xs font-bold px-3.5 py-1.5 rounded-md text-[#090D16] transition"
               >
                 <LogIn size={13} />
                 <span>Sign In / Role Demo</span>
@@ -281,8 +267,6 @@ export default function App() {
             onSessionsUpdated={fetchSessions}
             onNotify={addToast}
           />
-        ) : currentView === "analytics" ? (
-          <MetricsDashboard />
         ) : activeSession ? (
           <CollabEditor
             session={activeSession}

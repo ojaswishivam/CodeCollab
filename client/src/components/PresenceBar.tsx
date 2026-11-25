@@ -41,15 +41,15 @@ export const PresenceBar: React.FC<PresenceBarProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between bg-[#101017]/95 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-800/80 shadow-lg">
+    <div className="flex items-center justify-between bg-[#0D1117] px-3.5 py-2 rounded-lg border border-[#30363D]">
       {/* Left: Collaborator Badges */}
       <div className="flex items-center gap-3 overflow-x-auto py-0.5 max-w-[70%]">
         <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 shrink-0">
-          <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[#3B82F6]/15 border border-[#3B82F6]/30 text-[#60A5FA]">
             <Users size={13} />
           </div>
           <span className="tracking-wide">
-            Live Collaborators ({users.length}):
+            Active ({users.length})
           </span>
         </div>
 

@@ -63,7 +63,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Create session form state
   const [newTitle, setNewTitle] = useState("");
   const [newCode, setNewCode] = useState("");
-  const [newMode, setNewMode] = useState<"assessment" | "collaborative">("assessment");
+  const [newDuration, setNewDuration] = useState<number>(60);
   const [newLang, setNewLang] = useState<"python" | "javascript" | "cpp">("cpp");
   const [newProbTitle, setNewProbTitle] = useState("");
   const [newProbDesc, setNewProbDesc] = useState("");
@@ -165,11 +165,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         body: JSON.stringify({
           code: newCode || undefined,
           title: newTitle,
-          mode: newMode,
+          mode: "assessment",
           language: newLang,
           problemTitle: newProbTitle,
           problemDescription: newProbDesc,
-          proctoringEnabled: newMode === "assessment" ? newProctoring : false,
+          proctoringEnabled: newProctoring,
+          durationMinutes: Number(newDuration) || 60,
           testCases: newTestCases,
         }),
       });
@@ -202,33 +203,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 overflow-hidden text-white p-1">
+    <div className="flex-1 flex flex-col gap-3 overflow-hidden text-[#dfe2eb] p-0.5">
       {/* Top Teacher Control Bar */}
-      <div className="bg-[#12121a] border border-gray-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
-            <BookOpen size={20} />
+          <div className="w-9 h-9 rounded-lg bg-[#10B981]/15 border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
+            <BookOpen size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-extrabold text-white">
+              <h2 className="text-sm font-bold text-white">
                 Instructor Command Center
               </h2>
-              <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
+              <span className="text-[10px] bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/30 px-2 py-0.5 rounded font-mono font-bold uppercase">
                 Teacher Role
               </span>
             </div>
             <p className="text-xs text-gray-400">
-              Manage sessions, inspect isolated student workspaces (read-only), review proctoring alerts & evaluation scores
+              Manage sessions, inspect isolated student workspaces (read-only), review proctoring alerts &amp; evaluation scores
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <select
             value={activeSessionCode}
             onChange={(e) => onSelectSession(e.target.value)}
-            className="bg-[#1a1a24] border border-gray-700 text-xs font-bold text-indigo-300 px-3 py-2 rounded-xl focus:outline-none focus:border-indigo-500"
+            className="bg-[#161B22] border border-[#30363D] text-xs font-mono font-semibold text-[#60A5FA] px-3 py-1.5 rounded focus:outline-none focus:border-[#3B82F6]"
           >
             {sessions.map((s) => (
               <option key={s.id} value={s.code}>
@@ -239,7 +240,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
           <button
             onClick={fetchMonitoringData}
-            className="p-2 bg-[#1a1a24] hover:bg-[#232332] border border-gray-700 rounded-xl text-gray-300 transition"
+            className="p-2 bg-[#161B22] hover:bg-[#1f242c] border border-[#30363D] rounded text-gray-300 transition"
             title="Refresh Monitoring Data"
           >
             <RefreshCw size={14} />
@@ -247,7 +248,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
           <button
             onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-md shadow-purple-600/25"
+            className="flex items-center gap-1.5 bg-[#10B981] hover:bg-[#059669] text-[#090D16] text-xs font-bold px-3.5 py-1.5 rounded transition"
           >
             <Plus size={14} />
             <span>New Assignment / Session</span>
@@ -257,13 +258,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
       {/* Session Overview & Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center bg-[#14141e] p-1 rounded-xl border border-gray-800">
+        <div className="flex items-center bg-[#0D1117] p-0.5 rounded-lg border border-[#30363D]">
           <button
             onClick={() => setActiveTab("workspaces")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold transition ${
               activeTab === "workspaces"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-gray-400 hover:text-white"
+                ? "bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40"
+                : "text-gray-400 hover:text-white border border-transparent"
             }`}
           >
             <Users size={13} />
@@ -271,10 +272,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </button>
           <button
             onClick={() => setActiveTab("proctoring")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold transition ${
               activeTab === "proctoring"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-gray-400 hover:text-white"
+                ? "bg-[#F59E0B]/20 text-[#FBBF24] border border-[#F59E0B]/40"
+                : "text-gray-400 hover:text-white border border-transparent"
             }`}
           >
             <ShieldAlert size={13} />
@@ -282,10 +283,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </button>
           <button
             onClick={() => setActiveTab("submissions")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold transition ${
               activeTab === "submissions"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-gray-400 hover:text-white"
+                ? "bg-[#10B981]/20 text-[#34D399] border border-[#10B981]/40"
+                : "text-gray-400 hover:text-white border border-transparent"
             }`}
           >
             <Award size={13} />
@@ -297,9 +298,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           <div className="text-xs text-gray-400 flex items-center gap-2 font-mono">
             <span>Problem: <strong className="text-gray-200">{activeSession.problemTitle}</strong></span>
             <span>•</span>
-            <span>Test Cases: <strong className="text-indigo-300">{activeSession.testCases.length}</strong></span>
+            <span>Tests: <strong className="text-[#60A5FA]">{activeSession.testCases.length}</strong></span>
             <span>•</span>
-            <span>Proctoring: <strong className={activeSession.proctoringEnabled ? "text-emerald-400" : "text-gray-400"}>
+            <span>Proctoring: <strong className={activeSession.proctoringEnabled ? "text-[#34D399]" : "text-gray-400"}>
               {activeSession.proctoringEnabled ? "ON" : "OFF"}
             </strong></span>
           </div>
@@ -310,9 +311,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* TAB 1: LIVE STUDENT WORKSPACES */}
         {activeTab === "workspaces" && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
             {/* Student List */}
-            <div className="lg:col-span-5 bg-[#12121a] border border-gray-800 rounded-2xl p-4 overflow-y-auto space-y-2.5">
+            <div className="lg:col-span-5 bg-[#0D1117] border border-[#30363D] rounded-lg p-3.5 overflow-y-auto space-y-2.5">
               <div className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
                 Isolated Student Workspaces
               </div>
@@ -352,7 +353,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       </div>
 
                       <button
-                        onClick={() => setInspectingStudent(st)}
+                        onClick={() => {
+                          if (inspectingStudent?.yjsRoomId !== st.yjsRoomId) {
+                            setReadonlyEditor(null);
+                          }
+                          setInspectingStudent(st);
+                        }}
                         className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
                       >
                         <Eye size={13} />
@@ -382,24 +388,27 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </div>
 
             {/* Read-Only Live Monaco Code Inspector */}
-            <div className="lg:col-span-7 bg-[#12121a] border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+            <div className="lg:col-span-7 bg-[#0D1117] border border-[#30363D] rounded-lg overflow-hidden flex flex-col">
               {inspectingStudent ? (
                 <>
-                  <div className="px-4 py-2.5 bg-purple-950/40 border-b border-purple-500/30 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-purple-200 font-semibold">
-                      <Lock size={13} className="text-purple-400" />
+                  <div className="px-4 py-2 bg-[#161B22] border-b border-[#30363D] flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-[#34D399] font-semibold">
+                      <Lock size={13} className="text-[#10B981]" />
                       <span>
-                        Read-Only Inspection: <strong>{inspectingStudent.studentName}</strong> (Cannot overwrite student code)
+                        Read-Only Inspection: <strong className="text-white">{inspectingStudent.studentName}</strong> (Cannot overwrite student code)
                       </span>
                     </div>
                     <button
-                      onClick={() => setInspectingStudent(null)}
-                      className="text-gray-400 hover:text-white"
+                      onClick={() => {
+                        setReadonlyEditor(null);
+                        setInspectingStudent(null);
+                      }}
+                      className="text-gray-400 hover:text-white font-semibold"
                     >
                       Close
                     </button>
                   </div>
-                  <div className="flex-1 min-h-[300px]">
+                  <div className="flex-1 min-h-[260px]">
                     <Editor
                       key={inspectingStudent.yjsRoomId}
                       height="100%"
@@ -415,6 +424,34 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         minimap: { enabled: false },
                       }}
                     />
+                  </div>
+                  {/* Bottom Proctoring & Evaluation Summary Strip */}
+                  <div className="px-4 py-2 bg-[#161B22] border-t border-[#30363D] flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-400">
+                        Proctoring Alerts:{" "}
+                        <strong className={inspectingStudent.alertCount > 0 ? "text-[#FBBF24]" : "text-[#34D399]"}>
+                          {inspectingStudent.alertCount}
+                        </strong>
+                      </span>
+                      <span className="text-gray-600">|</span>
+                      <span className="text-gray-400">
+                        Latest Score:{" "}
+                        <strong className="text-[#60A5FA]">
+                          {inspectingStudent.latestSubmission
+                            ? `${inspectingStudent.latestSubmission.score}/100 (${inspectingStudent.latestSubmission.passedCount}/${inspectingStudent.latestSubmission.totalCount})`
+                            : "Not submitted"}
+                        </strong>
+                      </span>
+                    </div>
+                    {inspectingStudent.latestSubmission && (
+                      <button
+                        onClick={() => setSelectedReport(inspectingStudent.latestSubmission)}
+                        className="text-[#34D399] hover:underline font-bold"
+                      >
+                        Open Full Report ➔
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -649,40 +686,85 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-gray-400 font-bold uppercase block mb-1">Workspace Mode</label>
-                  <select
-                    value={newMode}
-                    onChange={(e) => setNewMode(e.target.value as any)}
-                    className="w-full bg-[#1a1a24] border border-gray-700 rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="assessment">Individual (Exam / Proctored)</option>
-                    <option value="collaborative">Collaborative (Shared CRDT)</option>
-                  </select>
+              <div className="space-y-3">
+                {/* Test Duration Selector (Quick Presets + Stepper) */}
+                <div className="bg-[#0D1117] border border-[#30363D] rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-gray-300 font-bold uppercase flex items-center gap-1.5 text-[11px]">
+                      <Clock size={12} className="text-[#60A5FA]" />
+                      <span>Test Duration</span>
+                    </label>
+                    <div className="flex items-center gap-1 bg-[#161B22] border border-[#30363D] rounded-lg px-1.5 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewDuration((d) => Math.max(5, d - 5))}
+                        className="px-1.5 py-0.5 text-gray-400 hover:text-white font-mono font-bold"
+                        title="Decrease by 5 mins"
+                      >
+                        -5
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={300}
+                        required
+                        value={newDuration}
+                        onChange={(e) => setNewDuration(Math.max(1, Math.min(300, Number(e.target.value) || 1)))}
+                        className="w-12 bg-transparent text-center text-white font-mono font-bold focus:outline-none"
+                      />
+                      <span className="text-[10px] text-gray-400 font-mono pr-1">min</span>
+                      <button
+                        type="button"
+                        onClick={() => setNewDuration((d) => Math.min(300, d + 5))}
+                        className="px-1.5 py-0.5 text-gray-400 hover:text-white font-mono font-bold"
+                        title="Increase by 5 mins"
+                      >
+                        +5
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[15, 30, 45, 60, 90, 120].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => setNewDuration(mins)}
+                        className={`py-1.5 rounded-lg font-mono text-[11px] font-bold border transition ${
+                          newDuration === mins
+                            ? "bg-[#3B82F6]/20 text-[#60A5FA] border-[#3B82F6]/50"
+                            : "bg-[#161B22] text-gray-400 border-[#30363D] hover:text-gray-200 hover:border-gray-600"
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-gray-400 font-bold uppercase block mb-1">Default Language</label>
-                  <select
-                    value={newLang}
-                    onChange={(e) => setNewLang(e.target.value as any)}
-                    className="w-full bg-[#1a1a24] border border-gray-700 rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="python">Python 3</option>
-                    <option value="cpp">C++ (GCC)</option>
-                    <option value="javascript">JavaScript (Node.js)</option>
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 bg-[#1a1a24] border border-gray-700 rounded-xl px-3 py-2 w-full cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newMode === "assessment" && newProctoring}
-                      disabled={newMode === "collaborative"}
-                      onChange={(e) => setNewProctoring(e.target.checked)}
-                    />
-                    <span>Enable AI Proctoring</span>
-                  </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-gray-400 font-bold uppercase block mb-1">Default Language</label>
+                    <select
+                      value={newLang}
+                      onChange={(e) => setNewLang(e.target.value as any)}
+                      className="w-full bg-[#1a1a24] border border-gray-700 rounded-xl px-3 py-2 text-white"
+                    >
+                      <option value="python">Python 3</option>
+                      <option value="cpp">C++ (GCC)</option>
+                      <option value="javascript">JavaScript (Node.js)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <label className="flex items-center gap-2 bg-[#1a1a24] border border-gray-700 rounded-xl px-3 py-2 w-full cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newProctoring}
+                        onChange={(e) => setNewProctoring(e.target.checked)}
+                      />
+                      <span>Enable AI Proctoring</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

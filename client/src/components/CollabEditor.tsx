@@ -490,21 +490,23 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-full gap-3 overflow-hidden">
-      {/* Left Sidebar: Problem Statement + Consent-Based Proctoring Monitor */}
-      <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-3 overflow-y-auto pr-0.5">
+    <div className="flex flex-col lg:flex-row h-full gap-2.5 overflow-hidden">
+      {/* Left Sidebar (320px Precision Proctor IDE Panel) */}
+      <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-2.5 overflow-y-auto pr-0.5">
         {/* Session & Problem Card */}
-        <div className="bg-[#12121a] border border-gray-800 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
+        <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-3.5 space-y-3">
+          <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2.5 border-b border-[#30363D]">
+            <span className="text-[10px] font-mono bg-[#3B82F6]/15 text-[#60A5FA] border border-[#3B82F6]/30 px-2 py-0.5 rounded font-bold">
               {session.code}
             </span>
             {session.mode === "assessment" && userRole === "student" && (
               <span
-                className={`flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                className={`flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
                   secondsLeft <= 300
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse"
-                    : "bg-[#1a1a26] text-sky-300 border-gray-700"
+                    ? "bg-[#F43F5E]/15 text-[#FB7185] border-[#F43F5E]/40 animate-pulse"
+                    : secondsLeft <= 900
+                    ? "bg-[#F59E0B]/15 text-[#FBBF24] border-[#F59E0B]/30"
+                    : "bg-[#161B22] text-gray-200 border-[#30363D]"
                 }`}
               >
                 <Clock size={10} />
@@ -512,33 +514,46 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
               </span>
             )}
             {session.mode === "assessment" ? (
-              <span className="flex items-center gap-1 text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+              <span className="flex items-center gap-1 text-[10px] bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/30 px-2 py-0.5 rounded font-mono font-semibold">
                 <Shield size={10} />
-                Isolated Workspace
+                Isolated
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+              <span className="flex items-center gap-1 text-[10px] bg-[#3B82F6]/15 text-[#60A5FA] border border-[#3B82F6]/30 px-2 py-0.5 rounded font-mono font-semibold">
                 <Users size={10} />
-                Shared CRDT Lab
+                Shared CRDT
               </span>
             )}
           </div>
 
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              <FileText size={12} className="text-indigo-400" />
-              <span>Assignment Problem</span>
+            <div className="flex items-center justify-between text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">
+              <span className="flex items-center gap-1.5">
+                <FileText size={11} className="text-[#60A5FA]" />
+                <span>Problem 01</span>
+              </span>
+              <span className="bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/30 px-1.5 py-0.5 rounded">
+                {session.testCases.length} Tests • 100 Pts
+              </span>
             </div>
-            <h3 className="text-sm font-extrabold text-white">{session.problemTitle}</h3>
+            <h3 className="text-sm font-bold text-white">{session.problemTitle}</h3>
             <p className="text-xs text-gray-300 whitespace-pre-line mt-1.5 leading-relaxed">
               {session.problemDescription}
             </p>
+            <div className="flex flex-wrap gap-1.5 mt-2.5 text-[10px] font-mono">
+              <span className="bg-[#161B22] border border-[#30363D] text-gray-300 px-2 py-0.5 rounded">
+                Time Limit: 5.0s
+              </span>
+              <span className="bg-[#161B22] border border-[#30363D] text-gray-300 px-2 py-0.5 rounded">
+                Memory: 128MB
+              </span>
+            </div>
           </div>
 
           {/* Sample Visible Test Cases */}
-          <div className="space-y-1.5 pt-2 border-t border-gray-800">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-              Sample Test Cases ({session.testCases.length} Total)
+          <div className="space-y-1.5 pt-2 border-t border-[#30363D]">
+            <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">
+              Sample Test Cases
             </div>
             {session.testCases
               .filter((tc) => !tc.isHidden)
@@ -546,13 +561,13 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
               .map((tc, i) => (
                 <div
                   key={tc.id}
-                  className="bg-[#0c0c12] border border-gray-800 rounded-xl p-2 text-[11px] font-mono space-y-1"
+                  className="bg-[#090D16] border border-[#30363D] rounded p-2 text-[11px] font-mono space-y-1"
                 >
                   <div className="text-gray-400">
-                    <span className="text-indigo-400 font-bold">#{i + 1} In:</span>{" "}
+                    <span className="text-[#60A5FA] font-bold">#{i + 1} In:</span>{" "}
                     {tc.input.replace(/\n/g, " | ").trim() || "(none)"}
                   </div>
-                  <div className="text-emerald-300">
+                  <div className="text-[#34D399]">
                     <span className="text-gray-400 font-bold">Out:</span> {tc.expectedOutput}
                   </div>
                 </div>
@@ -575,7 +590,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
       </aside>
 
       {/* Right Main Area: Presence Bar + Monaco Editor + Execution Console */}
-      <div className="flex-1 flex flex-col h-full gap-2.5 overflow-hidden select-none">
+      <div className="flex-1 flex flex-col h-full gap-2 overflow-hidden select-none">
         <PresenceBar
           users={activeUsers}
           currentUserName={userName}
@@ -583,18 +598,26 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
           onUpdateName={onUpdateUserName}
         />
 
-        <div className="flex-1 flex flex-col bg-[#101017] rounded-2xl overflow-hidden border border-gray-800/90 shadow-2xl">
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between px-4 py-2 bg-[#15151e] border-b border-gray-800 text-sm gap-2">
+        <div className="flex-1 flex flex-col bg-[#0D1117] rounded-lg overflow-hidden border border-[#30363D]">
+          {/* File Tab & Toolbar */}
+          <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[#161B22] border-b border-[#30363D] text-sm gap-2">
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Active Solution Tab */}
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[#0D1117] border border-[#30363D] border-t-2 border-t-[#3B82F6] rounded-t text-xs font-mono text-gray-200">
+                <span className={`w-2 h-2 rounded-full ${currentLangObj.badgeColor}`} />
+                <span>
+                  solution.{language === "python" ? "py" : language === "cpp" ? "cpp" : "js"}
+                </span>
+              </div>
+
               {/* Language Dropdown */}
               <div ref={langMenuRef} className="relative">
                 <button
                   type="button"
                   onClick={() => setIsLangMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 bg-[#1e1e28] hover:bg-[#252533] px-3 py-1.5 rounded-lg border border-gray-700/80 text-xs font-semibold text-gray-200 transition shadow-sm"
+                  className="flex items-center gap-2 bg-[#0D1117] hover:bg-[#1c2128] px-2.5 py-1.5 rounded border border-[#30363D] text-xs font-semibold text-gray-200 transition"
                 >
-                  <Code2 size={13} className="text-indigo-400" />
+                  <Code2 size={13} className="text-[#60A5FA]" />
                   <span>{currentLangObj.name}</span>
                   <ChevronDown
                     size={11}
@@ -603,7 +626,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
                 </button>
 
                 {isLangMenuOpen && (
-                  <div className="absolute top-full left-0 mt-1.5 w-48 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 flex flex-col">
+                  <div className="absolute top-full left-0 mt-1.5 w-48 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl py-1 z-30 flex flex-col">
                     {LANGUAGES.map((langItem) => (
                       <button
                         key={langItem.id}
@@ -611,43 +634,43 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
                         onClick={() => handleLanguageChange(langItem.id)}
                         className={`flex items-center justify-between px-3 py-2 text-xs text-left transition ${
                           language === langItem.id
-                            ? "bg-indigo-600/20 text-indigo-300 font-bold"
-                            : "text-gray-200 hover:bg-[#222232]"
+                            ? "bg-[#3B82F6]/15 text-[#60A5FA] font-bold"
+                            : "text-gray-200 hover:bg-[#1f242c]"
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${langItem.badgeColor}`} />
                           <span>{langItem.name}</span>
                         </div>
-                        {language === langItem.id && <Check size={13} className="text-indigo-400" />}
+                        {language === langItem.id && <Check size={13} className="text-[#3B82F6]" />}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Run Code */}
+              {/* Run Sample */}
               <button
                 onClick={handleRunCode}
                 disabled={isRunning}
-                className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-lg text-white transition shadow-md ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded border transition ${
                   isRunning
-                    ? "bg-gray-700 cursor-not-allowed opacity-80"
-                    : "bg-[#222230] hover:bg-[#2c2c3d] border border-gray-700"
+                    ? "bg-[#161B22] border-[#30363D] text-gray-400 cursor-not-allowed"
+                    : "bg-[#0D1117] hover:bg-[#1c2128] border-[#30363D] text-gray-200"
                 }`}
               >
                 {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                 <span>{isRunning ? "Running..." : "Run Sample"}</span>
               </button>
 
-              {/* Module 5: Submit & Evaluate */}
+              {/* Module 5: Submit & Evaluate (Emerald Primary CTA) */}
               <button
                 onClick={handleEvaluateSubmission}
                 disabled={isEvaluating}
-                className={`flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white transition shadow-md ${
+                className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded transition ${
                   isEvaluating
-                    ? "bg-gray-700 cursor-not-allowed opacity-80"
-                    : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40"
+                    ? "bg-gray-700 text-gray-300 cursor-not-allowed"
+                    : "bg-[#10B981] hover:bg-[#059669] text-[#090D16]"
                 }`}
               >
                 {isEvaluating ? (
@@ -663,7 +686,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
             <div className="flex items-center gap-2">
               <div
                 ref={fontMenuRef}
-                className="relative flex items-center bg-[#1e1e28] rounded-lg border border-gray-700/80 p-0.5 text-xs text-gray-300"
+                className="relative flex items-center bg-[#0D1117] rounded border border-[#30363D] p-0.5 text-xs text-gray-300"
               >
                 <button
                   type="button"
@@ -675,7 +698,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsFontMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-1 px-1.5 py-0.5 font-mono text-xs font-bold text-gray-200"
+                  className="flex items-center gap-1 px-1.5 py-0.5 font-mono text-xs font-semibold text-gray-200"
                 >
                   <Type size={11} className="text-gray-400" />
                   <span>{fontSize}px</span>
@@ -688,13 +711,13 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
                   <Plus size={11} />
                 </button>
                 {isFontMenuOpen && (
-                  <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#181824] border border-gray-700 rounded-xl shadow-2xl py-1 z-30 flex flex-col">
+                  <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl py-1 z-30 flex flex-col">
                     {FONT_SIZES.map((size) => (
                       <button
                         key={size}
                         type="button"
                         onClick={() => handleFontSizeChange(size)}
-                        className="px-3 py-1.5 text-xs text-left font-mono text-gray-300 hover:bg-[#222232]"
+                        className="px-3 py-1.5 text-xs text-left font-mono text-gray-300 hover:bg-[#1f242c]"
                       >
                         {size}px
                       </button>
@@ -705,7 +728,7 @@ export const CollabEditor: React.FC<CollabEditorProps> = ({
 
               <button
                 onClick={handleDownloadCode}
-                className="p-1.5 bg-[#1e1e28] hover:bg-[#282836] text-gray-300 hover:text-white rounded-lg border border-gray-700/80 transition"
+                className="p-1.5 bg-[#0D1117] hover:bg-[#1c2128] text-gray-300 hover:text-white rounded border border-[#30363D] transition"
                 title="Download source code"
               >
                 <Download size={13} />

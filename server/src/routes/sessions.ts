@@ -172,6 +172,8 @@ router.get("/:code/students", (req, res) => {
     (w) => w.sessionCode === sessionCode && !teacherIds.has(w.studentId)
   );
 
+  const session = memoryStore.sessions.get(sessionCode);
+
   const enriched = workspaces.map((ws) => {
     const logs = memoryStore.activityLogs.filter(
       (l) => l.sessionCode === sessionCode && l.studentId === ws.studentId
@@ -188,7 +190,10 @@ router.get("/:code/students", (req, res) => {
       alertCount,
       recentLogs: logs.slice(0, 5),
       latestSubmission,
-      yjsRoomId: `${sessionCode}__student__${ws.studentId}`,
+      yjsRoomId:
+        session?.mode === "collaborative"
+          ? `${sessionCode}__shared`
+          : `${sessionCode}__student__${ws.studentId}`,
     };
   });
 

@@ -386,30 +386,30 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
 
   if (!enabled) {
     return (
-      <div className="bg-[#12121a] border border-gray-800 rounded-xl p-3 text-xs text-gray-400 flex items-center gap-2">
-        <ShieldCheck size={15} className="text-emerald-400 shrink-0" />
+      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-3 text-xs text-gray-400 flex items-center gap-2">
+        <ShieldCheck size={15} className="text-[#10B981] shrink-0" />
         <span>Collaborative Lab Mode — Proctoring is disabled for this session.</span>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#12121a] border border-gray-800 rounded-2xl p-3.5 flex flex-col gap-3">
+    <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-3 flex flex-col gap-2.5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2 border-b border-[#30363D]">
         <div className="flex items-center gap-2">
-          <Eye size={14} className="text-indigo-400" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider">
-            AI Proctoring Guard
+          <Eye size={14} className="text-[#10B981]" />
+          <span className="text-[11px] font-bold text-white uppercase tracking-wider font-mono">
+            AI Proctor Guard
           </span>
         </div>
         {consented ? (
-          <span className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/30 px-2 py-0.5 rounded font-mono font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
             Active
           </span>
         ) : (
-          <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+          <span className="text-[10px] bg-[#F59E0B]/15 text-[#FBBF24] border border-[#F59E0B]/30 px-2 py-0.5 rounded font-mono font-semibold">
             Consent Required
           </span>
         )}
@@ -417,9 +417,9 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
 
       {/* Consent Prompt */}
       {!consented ? (
-        <div className="bg-[#181824] border border-indigo-500/30 rounded-xl p-3 space-y-2.5">
+        <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-3 space-y-2.5">
           <div className="flex items-start gap-2 text-[11px] text-gray-300 leading-relaxed">
-            <Info size={14} className="text-indigo-400 shrink-0 mt-0.5" />
+            <Info size={14} className="text-[#60A5FA] shrink-0 mt-0.5" />
             <p>
               This assessment uses <strong>transparent, consent-based proctoring</strong>:
               webcam face presence, head-pose estimation, tab switches, full-screen exits,
@@ -429,15 +429,15 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
           </div>
           <button
             onClick={handleConsentAndStart}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2 rounded-lg transition shadow"
+            className="w-full bg-[#10B981] hover:bg-[#059669] text-[#090D16] text-xs font-bold py-2 rounded transition"
           >
-            I Consent — Enable Webcam & Full-Screen
+            I Consent — Enable Webcam &amp; Full-Screen
           </button>
         </div>
       ) : (
         <>
-          {/* Webcam Preview */}
-          <div className="relative rounded-xl overflow-hidden bg-black border border-gray-800 aspect-video flex items-center justify-center">
+          {/* Webcam Preview with Reticle Corners */}
+          <div className="relative rounded-lg overflow-hidden bg-[#090D16] border border-[#30363D] aspect-video flex items-center justify-center">
             <video
               ref={videoRef}
               autoPlay
@@ -446,6 +446,15 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
               className={`w-full h-full object-cover ${webcamActive ? "block" : "hidden"}`}
             />
             <canvas ref={canvasRef} className="hidden" />
+
+            {webcamActive && (
+              <>
+                <span className="pointer-events-none absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-[#10B981]/70 rounded-tl-sm" />
+                <span className="pointer-events-none absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-[#10B981]/70 rounded-tr-sm" />
+                <span className="pointer-events-none absolute bottom-8 left-2 w-3 h-3 border-b-2 border-l-2 border-[#10B981]/70 rounded-bl-sm" />
+                <span className="pointer-events-none absolute bottom-8 right-2 w-3 h-3 border-b-2 border-r-2 border-[#10B981]/70 rounded-br-sm" />
+              </>
+            )}
 
             {!webcamActive && (
               <div className="text-center p-3 space-y-2">
@@ -500,6 +509,36 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
               <span>Re-enter Full-Screen Mode</span>
             </button>
           )}
+
+          {/* Integrity & Telemetry Checklist (Stitch Precision Proctor HUD) */}
+          <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-2.5 space-y-1.5 text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 font-medium">Integrity Score</span>
+              <span className="font-mono font-bold text-[#34D399]">
+                {Math.max(60, 100 - localLogs.filter((l) => l.severity !== "info").length * 5).toFixed(1)}%
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-[#090D16] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#10B981] transition-all duration-300"
+                style={{
+                  width: `${Math.max(60, 100 - localLogs.filter((l) => l.severity !== "info").length * 5)}%`,
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1 text-[10px] font-mono">
+              <span className="text-gray-400">Tab Focus</span>
+              <span className={localLogs.some((l) => l.eventType === "tab_switch") ? "text-[#FBBF24]" : "text-[#34D399]"}>
+                {localLogs.filter((l) => l.eventType === "tab_switch").length} blur events
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-gray-400">Full-Screen Lock</span>
+              <span className={isFullscreen ? "text-[#34D399]" : "text-[#FBBF24]"}>
+                {isFullscreen ? "Locked (OK)" : "Unlocked"}
+              </span>
+            </div>
+          </div>
 
           {/* Webcam Toggle */}
           <div className="flex items-center justify-between text-[11px] text-gray-400">

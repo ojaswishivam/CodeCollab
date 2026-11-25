@@ -153,25 +153,25 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
   };
 
   const containerClasses = isFullscreen
-    ? "fixed inset-4 z-50 bg-[#0e0e14] border border-gray-700 rounded-2xl shadow-2xl flex flex-col font-mono text-xs overflow-hidden"
-    : `${getHeightClass()} bg-[#0e0e14] border-t border-gray-800 flex flex-col font-mono text-xs transition-all duration-200`;
+    ? "fixed inset-4 z-50 bg-[#090D16] border border-[#30363D] rounded-lg shadow-2xl flex flex-col font-mono text-xs overflow-hidden"
+    : `${getHeightClass()} bg-[#090D16] border-t border-[#30363D] flex flex-col font-mono text-xs transition-all duration-200`;
 
   return (
     <div className={containerClasses}>
       {/* Panel Top Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#14141c] border-b border-gray-800 select-none">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161B22] border-b border-[#30363D] select-none">
         {/* Left: Tab Selectors & Status */}
         <div className="flex items-center gap-2 whitespace-nowrap min-w-0">
-          <div className="flex items-center bg-[#1e1e28] p-0.5 rounded-lg border border-gray-700/80 shrink-0">
+          <div className="flex items-center bg-[#0D1117] p-0.5 rounded border border-[#30363D] shrink-0">
             <button
               onClick={() => {
                 setActiveTab("output");
                 if (isCollapsed) setIsCollapsed(false);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition ${
                 activeTab === "output"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-400 hover:text-gray-200"
+                  ? "bg-[#10B981]/20 text-[#34D399] border border-[#10B981]/30"
+                  : "text-gray-400 hover:text-gray-200 border border-transparent"
               }`}
             >
               <Terminal size={12} />
@@ -183,16 +183,16 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 setActiveTab("stdin");
                 if (isCollapsed) setIsCollapsed(false);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition ${
                 activeTab === "stdin"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-400 hover:text-gray-200"
+                  ? "bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/30"
+                  : "text-gray-400 hover:text-gray-200 border border-transparent"
               }`}
             >
               <Sliders size={12} />
               <span>Input (stdin)</span>
               {stdin && (
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] animate-pulse" />
               )}
             </button>
           </div>
